@@ -14,15 +14,15 @@ import (
 	"github.com/internet-computer/oko/config/schema"
 )
 
-func New() Package {
-	return Package{
-		Dependencies: make([]PackageInfo, 0),
-	}
-}
-
 type Package struct {
 	CompilerVersion *string       `json:"compiler,omitempty"`
 	Dependencies    []PackageInfo `json:"dependencies"`
+}
+
+func EmptyPackage() Package {
+	return Package{
+		Dependencies: make([]PackageInfo, 0),
+	}
 }
 
 func LoadPackage(path string) (*Package, error) {
@@ -33,11 +33,12 @@ func LoadPackage(path string) (*Package, error) {
 	if err := schema.Validate(raw); err != nil {
 		return nil, err
 	}
+	return NewPackage(raw)
+}
+
+func NewPackage(raw []byte) (*Package, error) {
 	var pkg Package
-	if err := json.Unmarshal(raw, &pkg); err != nil {
-		return nil, err
-	}
-	return &pkg, nil
+	return &pkg, json.Unmarshal(raw, &pkg)
 }
 
 func (p *Package) Add(dependencies ...PackageInfo) {
@@ -48,9 +49,6 @@ func (p *Package) Add(dependencies ...PackageInfo) {
 			p.Dependencies = append(p.Dependencies, dep)
 		}
 	}
-	sort.Slice(p.Dependencies, func(i, j int) bool {
-		return strings.Compare(p.Dependencies[i].Name, p.Dependencies[j].Name) == -1
-	})
 }
 
 func (p *Package) Contains(info PackageInfo) (string, bool) {
@@ -73,6 +71,17 @@ func (p Package) Download() error {
 		}
 	}
 	return nil
+}
+
+func (p Package) Save(path string) error {
+	sort.Slice(p.Dependencies, func(i, j int) bool {
+		return strings.Compare(p.Dependencies[i].Name, p.Dependencies[j].Name) == -1
+	})
+	dataM, err := json.MarshalIndent(p, "", "\t")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, dataM, os.ModePerm)
 }
 
 func (p Package) Set() map[string]PackageInfo {

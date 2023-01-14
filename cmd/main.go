@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/internet-computer/oko/config"
@@ -20,11 +18,10 @@ var downloadCommand = cmd.Command{
 	Method: func(_ []string, _ map[string]string) error {
 		pkg, err := config.LoadPackage("./oko.json")
 		if err != nil {
-			fmt.Printf("Could not load `oko.json`: %s\n", err)
-			return nil
+			return fmt.Errorf("could not load `oko.json`: %s", err)
 		}
 		if err := pkg.Download(); err != nil {
-			fmt.Printf("Could not download packages: %s\n", err)
+			return fmt.Errorf("could not download packages: %s", err)
 		}
 		return nil
 	},
@@ -34,14 +31,9 @@ var initCommand = cmd.Command{
 	Name: "init",
 	Method: func(_ []string, _ map[string]string) error {
 		if _, err := config.LoadPackage("./oko.json"); err == nil {
-			fmt.Println("`oko.json` already exists.")
-			return nil
+			return fmt.Errorf("`oko.json` already exists: %s", err)
 		}
-		if dataM, err := json.MarshalIndent(config.New(), "", "\t"); err == nil {
-			return os.WriteFile("oko.json", dataM, os.ModePerm)
-		} else {
-			return err
-		}
+		return config.EmptyPackage().Save("./oko.json")
 	},
 }
 
@@ -52,53 +44,45 @@ var installCommand = cmd.Command{
 	Method: func(args []string, _ map[string]string) error {
 		url := args[0]
 		if !strings.HasPrefix(url, "github.com") {
-			fmt.Println("Url needs to start with `github.com`.")
-			return nil
+			return fmt.Errorf("url needs to start with `github.com`")
 		}
+		version := args[1]
 		info := config.PackageInfo{
 			Repository: fmt.Sprintf("https://%s", url),
-			Version:    args[1],
+			Version:    version,
 		}
+
+		// Ask for rename of package.
 		if name := url[strings.LastIndex(url, "/")+1:]; cmd.AskForConfirmation(fmt.Sprintf("Do you want to rename the package name %q?", name)) {
 			info.Name = strings.TrimSpace(cmd.Ask("New name"))
 		} else {
 			info.Name = name
 		}
 
-		raw, err := os.ReadFile("./oko.json")
+		pkg, err := config.LoadPackage("./oko.json")
 		if err != nil {
-			fmt.Println("Could not find `oko.json` in the current working directory.")
-			return nil
-		}
-		var pkg config.Package
-		if err := json.Unmarshal(raw, &pkg); err != nil {
-			fmt.Println("Invalid `oko.json` format.")
-			return nil
+			return fmt.Errorf("could not load `oko.json`: %s", err)
+
 		}
 		if _, ok := pkg.Contains(info); ok {
-			fmt.Println("Already added to `oko.json`.")
-			return nil
+			return fmt.Errorf("already added to `oko.json`")
 		}
 		if err := info.Download(); err != nil {
 			return err
 		}
 
-		rawM, err := os.ReadFile(fmt.Sprintf("%s/vessel.dhall", info.RelativePathDownload()))
-		if err == nil {
+		if rawM, err := os.ReadFile(fmt.Sprintf("%s/vessel.dhall", info.RelativePathDownload())); err == nil {
 			manifest, err := vessel.NewManifest(rawM)
 			if err != nil {
 				return err
 			}
 			info.Dependencies = manifest.Dependencies
 
-			var replaced = make(map[string]string) // list of replaced dep names
+			// List of replaced dependency names.
+			var replaced = make(map[string]string)
 			var newPackages []config.PackageInfo
 			if len(manifest.Dependencies) != 0 {
-				rawS, err := os.ReadFile(fmt.Sprintf("%s/package-set.dhall", info.RelativePathDownload()))
-				if err != nil {
-					return err
-				}
-				packageSet, err := vessel.NewPackageSet(rawS)
+				packageSet, err := vessel.LoadPackageSet(fmt.Sprintf("%s/package-set.dhall", info.RelativePathDownload()))
 				if err != nil {
 					return err
 				}
@@ -125,7 +109,7 @@ var installCommand = cmd.Command{
 					}
 				}
 			}
-			pkg.Dependencies = append(pkg.Dependencies, newPackages...)
+			pkg.Add(newPackages...)
 		} else {
 			if false {
 				// Check for Oko packages?
@@ -136,17 +120,9 @@ var installCommand = cmd.Command{
 				}
 			}
 		}
-		pkg.Dependencies = append(pkg.Dependencies, info)
 
-		sort.Slice(pkg.Dependencies, func(i, j int) bool {
-			return strings.Compare(pkg.Dependencies[i].Name, pkg.Dependencies[j].Name) == -1
-		})
-
-		dataM, err := json.MarshalIndent(pkg, "", "\t")
-		if err != nil {
-			return err
-		}
-		return os.WriteFile("oko.json", dataM, os.ModePerm)
+		pkg.Add(info)
+		return pkg.Save("./oko.json")
 	},
 }
 
@@ -164,45 +140,37 @@ var migrateCommand = cmd.Command{
 		},
 	},
 	Method: func(_ []string, options map[string]string) error {
-		rawM, err := os.ReadFile("./vessel.dhall")
-		if err != nil {
-			fmt.Println("Could not find `vessel.dhall` in the current working directory.")
-			return nil
+		if 2 <= len(options) {
+			return fmt.Errorf("can not use both `delete` and `keep` at the same time")
 		}
-		manifest, err := vessel.NewManifest(rawM)
+
+		manifest, err := vessel.LoadManifest("./vessel.dhall")
 		if err != nil {
-			fmt.Println("Could not read `vessel.dhall`.")
-			return nil
+			return fmt.Errorf("could not read `vessel.dhall`: %s", err)
 		}
-		rawS, err := os.ReadFile("./package-set.dhall")
+		packageSet, err := vessel.LoadPackageSet("./package-set.dhall")
 		if err != nil {
-			fmt.Println("Could not find `package-set.dhall` in the current working directory.")
-			return nil
+			return fmt.Errorf("could not read `package-set.dhall`: %s", err)
 		}
-		packageSet, err := vessel.NewPackageSet(rawS)
-		if err != nil {
-			fmt.Println("Could not read `package-set.dhall`.")
-			return nil
-		}
+
 		packages, err := packageSet.Filter(manifest.Dependencies)
 		if err != nil {
-			fmt.Println("Package set incomplete!")
-			return nil
+			return fmt.Errorf("package set incomplete: %s", err)
 		}
-		dataM, err := json.MarshalIndent(manifest.Oko(packages), "", "\t")
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile("oko.json", dataM, os.ModePerm); err != nil {
-			return err
+
+		if err := manifest.Save("./oko.json", packages); err != nil {
+			return fmt.Errorf("failed saving package set: %s", err)
 		}
 
 		// Optional delete.
 		if _, ok := options["keep"]; ok {
 			return nil
 		}
-		if _, ok := options["delete"]; ok || cmd.AskForConfirmation("Do you want to delete the `vessel.dhall` file?") {
+		if _, ok := options["delete"]; ok || cmd.AskForConfirmation("Do you want to delete the `vessel.dhall` and `package-set.dhall` file?") {
 			if err := os.Remove("./vessel.dhall"); err != nil {
+				return err
+			}
+			if err := os.Remove("./package-set.dhall"); err != nil {
 				return err
 			}
 		}
@@ -227,17 +195,12 @@ var sourcesCommand = cmd.Command{
 	Name:    "sources",
 	Summary: "prints moc package sources",
 	Method: func(_ []string, _ map[string]string) error {
-		var sources []string
-		raw, err := os.ReadFile("./oko.json")
+		pkg, err := config.LoadPackage("./oko.json")
 		if err != nil {
-			fmt.Println("Could not find `oko.json` in the current working directory.")
-			return nil
+			return fmt.Errorf("could not load `oko.json`: %s", err)
 		}
-		var pkg config.Package
-		if err := json.Unmarshal(raw, &pkg); err != nil {
-			fmt.Println("Invalid `oko.json` format.")
-			return nil
-		}
+
+		var sources []string
 		for _, dep := range pkg.Dependencies {
 			sources = append(sources, fmt.Sprintf(
 				"--package %s %s/src", dep.Name, dep.RelativePathDownload(),
@@ -269,7 +232,7 @@ func main() {
 		return
 	}
 	if err := oko.Call(os.Args[1:]...); err != nil {
-		fmt.Printf("\nERR: %s\n\n", err)
-		oko.Help()
+		fmt.Printf("ERROR: %s\n", err)
+		os.Exit(1)
 	}
 }

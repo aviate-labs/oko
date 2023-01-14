@@ -1,6 +1,8 @@
 package vessel
 
 import (
+	"os"
+
 	"github.com/internet-computer/oko/config"
 	"github.com/philandstuff/dhall-golang/v6"
 )
@@ -10,9 +12,17 @@ type Manifest struct {
 	Dependencies []string `dhall:"dependencies"`
 }
 
-func NewManifest(raw []byte) (Manifest, error) {
+func LoadManifest(path string) (*Manifest, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return NewManifest(raw)
+}
+
+func NewManifest(raw []byte) (*Manifest, error) {
 	var manifest Manifest
-	return manifest, dhall.Unmarshal(raw, &manifest)
+	return &manifest, dhall.Unmarshal(raw, &manifest)
 }
 
 func (m Manifest) Oko(set PackageSet) config.Package {
@@ -20,4 +30,8 @@ func (m Manifest) Oko(set PackageSet) config.Package {
 		CompilerVersion: m.Compiler,
 		Dependencies:    set.Oko(),
 	}
+}
+
+func (m Manifest) Save(path string, set PackageSet) error {
+	return m.Oko(set).Save(path)
 }

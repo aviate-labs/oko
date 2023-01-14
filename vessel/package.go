@@ -1,8 +1,7 @@
 package vessel
 
 import (
-	"sort"
-	"strings"
+	"os"
 
 	"github.com/internet-computer/oko/config"
 	"github.com/philandstuff/dhall-golang/v6"
@@ -19,7 +18,15 @@ type PackageSet struct {
 	Packages map[string]Package
 }
 
-func NewPackageSet(raw []byte) (PackageSet, error) {
+func LoadPackageSet(path string) (*PackageSet, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return NewPackageSet(raw)
+}
+
+func NewPackageSet(raw []byte) (*PackageSet, error) {
 	var (
 		set = PackageSet{
 			Packages: make(map[string]Package),
@@ -27,15 +34,15 @@ func NewPackageSet(raw []byte) (PackageSet, error) {
 		list []Package
 	)
 	if err := dhall.Unmarshal(raw, &list); err != nil {
-		return PackageSet{}, err
+		return nil, err
 	}
 	for _, pkg := range list {
 		if v, ok := set.Packages[pkg.Name]; ok {
-			return set, DuplicatePackageName(pkg, v)
+			return &set, DuplicatePackageName(pkg, v)
 		}
 		set.Packages[pkg.Name] = pkg
 	}
-	return set, nil
+	return &set, nil
 }
 
 func (set PackageSet) Filter(packages []string) (PackageSet, error) {
@@ -68,8 +75,5 @@ func (set PackageSet) Oko() []config.PackageInfo {
 			Dependencies: pkg.Dependencies,
 		})
 	}
-	sort.Slice(packages, func(i, j int) bool {
-		return strings.Compare(packages[i].Name, packages[j].Name) == -1
-	})
 	return packages
 }
