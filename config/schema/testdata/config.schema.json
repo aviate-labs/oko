@@ -1,0 +1,48 @@
+{
+    "$id": "https://github.com/internet-computer/oko/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Person",
+    "type": "object",
+    "required": [
+        "dependencies"
+    ],
+    "properties": {
+        "compiler": {
+            "type": "string"
+        },
+        "dependencies": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "repository",
+                    "version"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "alts": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "repository": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "string"
+                    },
+                    "dependencies": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
