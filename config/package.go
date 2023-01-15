@@ -95,9 +95,14 @@ func (p Package) Set() map[string]PackageInfo {
 type PackageInfo struct {
 	Name             string   `json:"name"`
 	AlternativeNames []string `json:"alts,omitempty"`
+	Local            *bool    `json:"local,omitempty"`
 	Repository       string   `json:"repository"`
-	Version          string   `json:"version"`
+	Version          string   `json:"version,omitempty"`
 	Dependencies     []string `json:"dependencies,omitempty"`
+}
+
+func (p PackageInfo) IsLocal() bool {
+	return p.Local != nil && *p.Local
 }
 
 func (p *PackageInfo) AddName(name string) {
@@ -156,6 +161,10 @@ func (p PackageInfo) Download() error {
 }
 
 func (p PackageInfo) RelativePathDownload() string {
+	if p.IsLocal() {
+		return p.Repository
+	}
+
 	repo := strings.TrimSuffix(p.Repository, ".git")
 	version := strings.TrimPrefix(p.Version, "v")
 	return fmt.Sprintf(".oko/%s-%s", repo[strings.LastIndex(repo, "/")+1:], version)

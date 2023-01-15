@@ -12,8 +12,6 @@ func trimPrefix(s, prefix string) (string, bool) {
 	return s, false
 }
 
-type Arguments []string
-
 // A command with either sub-commands or a list of arguments.
 type Command struct {
 	// The name of the command.
@@ -28,7 +26,7 @@ type Command struct {
 	Commands []Command
 
 	// A list of arguments.
-	Args Arguments
+	Args []string
 	// Options of the command.
 	// e.g. --all, etc.
 	Options []Option
@@ -49,7 +47,7 @@ func (c Command) Call(args ...string) error {
 
 // checkArguments returns an error if the number of arguments do not equal the
 // expected amount.
-func (c Command) checkArguments(args Arguments) error {
+func (c Command) checkArguments(args []string) error {
 	l := len(c.Args)
 	if len(args) != l {
 		var s []string
@@ -69,7 +67,7 @@ func (c Command) checkArguments(args Arguments) error {
 	return nil
 }
 
-func (c Command) command(name string, args Arguments) error {
+func (c Command) command(name string, args []string) error {
 	var cmd Command
 	for _, c := range c.Commands {
 		for _, n := range append([]string{c.Name}, c.Aliases...) {
@@ -85,9 +83,9 @@ func (c Command) command(name string, args Arguments) error {
 	return cmd.Call(args...)
 }
 
-func (c Command) extractOptions(args Arguments) (Arguments, map[string]string) {
+func (c Command) extractOptions(args []string) ([]string, map[string]string) {
 	var (
-		arguments Arguments
+		arguments []string
 		arg       string
 		options   = make(map[string]string)
 	)
@@ -129,7 +127,7 @@ func (c Command) extractOptions(args Arguments) (Arguments, map[string]string) {
 	return arguments, options
 }
 
-func (c Command) method(args Arguments) error {
+func (c Command) method(args []string) error {
 	if len(args) == 1 && args[0] == "help" {
 		c.Help()
 		return nil
@@ -147,5 +145,6 @@ func (c Command) method(args Arguments) error {
 
 type Option struct {
 	Name     string
+	Summary  string
 	HasValue bool
 }

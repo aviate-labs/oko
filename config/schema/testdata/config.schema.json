@@ -29,6 +29,9 @@
                             "type": "string"
                         }
                     },
+                    "local": {
+                        "type": "boolean"
+                    },
                     "repository": {
                         "type": "string"
                     },

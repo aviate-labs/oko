@@ -14,6 +14,7 @@ const VERSION = "v0.0.0"
 
 var downloadCommand = cmd.Command{
 	Name:    "download",
+	Aliases: []string{"d"},
 	Summary: "download packages",
 	Method: func(_ []string, _ map[string]string) error {
 		pkg, err := config.LoadPackage("./oko.json")
@@ -28,7 +29,8 @@ var downloadCommand = cmd.Command{
 }
 
 var initCommand = cmd.Command{
-	Name: "init",
+	Name:    "init",
+	Summary: "initialize Oko",
 	Method: func(_ []string, _ map[string]string) error {
 		if _, err := config.LoadPackage("./oko.json"); err == nil {
 			return fmt.Errorf("`oko.json` already exists: %s", err)
@@ -39,8 +41,68 @@ var initCommand = cmd.Command{
 
 var installCommand = cmd.Command{
 	Name:    "install",
+	Aliases: []string{"i"},
+	Summary: "install packages",
+	Commands: []cmd.Command{
+		installGitHubCommand,
+		installLocalCommand,
+	},
+}
+
+var installLocalCommand = cmd.Command{
+	Name:    "local",
+	Aliases: []string{"l"},
+	Summary: "install local packages",
+	Args:    []string{"path"},
+	Options: []cmd.Option{
+		{
+			Name:     "name",
+			Summary:  "local path",
+			HasValue: true,
+		},
+	},
+	Method: func(args []string, options map[string]string) error {
+		path := args[0]
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return fmt.Errorf("could not find  %q", path)
+		}
+		local := true
+		info := config.PackageInfo{
+			Repository: path,
+			Local:      &local,
+			Version:    "*",
+		}
+
+		name, ok := options["name"]
+		if !ok {
+			// Ask for rename of package.
+			name := path[strings.LastIndex(path, "/")+1:]
+			if cmd.AskForConfirmation(fmt.Sprintf("Do you want to rename the package name %q?", name)) {
+				info.Name = strings.TrimSpace(cmd.Ask("New name"))
+			} else {
+				info.Name = name
+			}
+		} else {
+			info.Name = name
+		}
+
+		pkg, err := config.LoadPackage("./oko.json")
+		if err != nil {
+			return fmt.Errorf("could not load `oko.json`: %s", err)
+		}
+		if _, ok := pkg.Contains(info); ok {
+			return fmt.Errorf("already added to `oko.json`")
+		}
+		pkg.Add(info)
+		return pkg.Save("./oko.json")
+	},
+}
+
+var installGitHubCommand = cmd.Command{
+	Name:    "github",
+	Aliases: []string{"gh"},
 	Summary: "install GitHub hosted packages",
-	Args:    cmd.Arguments{"url", "version"},
+	Args:    []string{"url", "version"},
 	Method: func(args []string, _ map[string]string) error {
 		url := args[0]
 		if !strings.HasPrefix(url, "github.com") {
@@ -62,7 +124,6 @@ var installCommand = cmd.Command{
 		pkg, err := config.LoadPackage("./oko.json")
 		if err != nil {
 			return fmt.Errorf("could not load `oko.json`: %s", err)
-
 		}
 		if _, ok := pkg.Contains(info); ok {
 			return fmt.Errorf("already added to `oko.json`")
@@ -202,6 +263,13 @@ var sourcesCommand = cmd.Command{
 
 		var sources []string
 		for _, dep := range pkg.Dependencies {
+			if dep.IsLocal() {
+				sources = append(sources, fmt.Sprintf(
+					"--package %s %s", dep.Name, dep.RelativePathDownload(),
+				))
+				continue
+			}
+
 			sources = append(sources, fmt.Sprintf(
 				"--package %s %s/src", dep.Name, dep.RelativePathDownload(),
 			))

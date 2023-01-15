@@ -17,6 +17,12 @@ func TestValidate(t *testing.T) {
 				"alts": [ "t" ],
 				"repository": "url",
 				"version": "v0.0.1"
+			},
+			{
+				"name": "local",
+				"local": true,
+				"repository": "path",
+				"version": "*"
 			}
 		]
 	}`)); err != nil {

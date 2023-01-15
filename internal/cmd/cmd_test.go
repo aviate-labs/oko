@@ -11,8 +11,8 @@ var (
 		Name: "sub",
 		Args: []string{"c"},
 		Options: []cmd.Option{
-			{"all", false},
-			{"v", true},
+			{"all", "", false},
+			{"v", "", true},
 		},
 		Method: func(args []string, options map[string]string) error {
 			fmt.Println(args, options)
@@ -33,7 +33,7 @@ func ExampleCommand_Help() {
 	// 	test <command>
 	//
 	// Commands:
-	// 	sub
+	// 	<sub>
 }
 
 func ExampleCommand_Help_sub() {
@@ -44,7 +44,7 @@ func ExampleCommand_Help_sub() {
 	//
 	// Optional arguments:
 	//	all
-	//	v		<value>
+	//	v  	<value>
 }
 
 func ExampleCommand_Help_subC() {
