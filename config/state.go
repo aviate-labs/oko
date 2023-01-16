@@ -48,13 +48,16 @@ func NewPackageState(pkg *Package) *PackageState {
 	}
 	state.CompilerVersion = pkg.CompilerVersion
 	for _, dep := range pkg.Dependencies {
-		state.Dependencies[dep.Name] = &dep
+		d := dep // copy
+		state.Dependencies[dep.Name] = &d
 	}
 	for _, dep := range pkg.LocalDependencies {
-		state.LocalDependencies[dep.Name] = &dep
+		d := dep // copy
+		state.LocalDependencies[dep.Name] = &d
 	}
 	for _, dep := range pkg.TransitiveDependencies {
-		state.TransitiveDependencies[dep.Name] = &dep
+		d := dep // copy
+		state.TransitiveDependencies[dep.Name] = &d
 	}
 	return &state
 }
@@ -117,7 +120,8 @@ func (s *PackageState) AddPackage(pkg PackageInfoRemote, dependencies ...Package
 					d.AlternativeNames = append(d.AlternativeNames, dep.Name)
 				}
 			} else {
-				s.TransitiveDependencies[dep.Name] = &dep
+				d := dep //copy
+				s.TransitiveDependencies[dep.Name] = &d
 			}
 		}
 	}
@@ -215,9 +219,7 @@ func (s *PackageState) RemovePackage(name string) error {
 
 				// Try to remove the dependencies too.
 				for _, name := range dep.Dependencies {
-					if err := s.RemovePackage(name); err != nil {
-						_ = s.removeTransitivePackage(name)
-					}
+					_ = s.removeTransitivePackage(name)
 				}
 			} else {
 				dep.Name = dep.AlternativeNames[0]
@@ -287,7 +289,7 @@ func (s *PackageState) removeTransitivePackage(name string) error {
 			if len(dep.AlternativeNames) == 0 {
 				delete(s.TransitiveDependencies, name)
 
-				// Try to remove the other transitive dependencies too.
+				// Try to remove the dependencies too.
 				for _, name := range dep.Dependencies {
 					_ = s.removeTransitivePackage(name)
 				}

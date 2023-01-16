@@ -110,7 +110,6 @@ var installGitHubCommand = cmd.Command{
 				return err
 			}
 			info.Dependencies = manifest.Dependencies
-			var dependencies []config.PackageInfoRemote
 			if len(manifest.Dependencies) != 0 {
 				packageSet, err := vessel.LoadPackageSet(fmt.Sprintf("%s/package-set.dhall", info.RelativePath()))
 				if err != nil {
@@ -120,11 +119,8 @@ var installGitHubCommand = cmd.Command{
 				if err != nil {
 					return err
 				}
-				for _, dep := range packages.Oko() {
-					dependencies = append(dependencies, dep)
-				}
+				state.AddPackage(info, packages.Oko()...)
 			}
-			state.AddPackage(info, dependencies...)
 		} else {
 			if false {
 				// Check for Oko packages?

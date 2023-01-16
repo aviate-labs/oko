@@ -2,6 +2,7 @@ package vessel
 
 import (
 	"os"
+	"strings"
 
 	"github.com/internet-computer/oko/config"
 	"github.com/philandstuff/dhall-golang/v6"
@@ -70,7 +71,7 @@ func (set PackageSet) Oko() []config.PackageInfoRemote {
 	for _, pkg := range set.Packages {
 		packages = append(packages, config.PackageInfoRemote{
 			Name:         pkg.Name,
-			Repository:   pkg.Repo,
+			Repository:   strings.TrimSuffix(pkg.Repo, ".git"),
 			Version:      pkg.Version,
 			Dependencies: pkg.Dependencies,
 		})

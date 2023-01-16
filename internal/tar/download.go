@@ -68,7 +68,6 @@ func DownloadGz(url string, path string) error {
 	}
 	tr := tar.NewReader(gzr)
 	for h, err := tr.Next(); err == nil; h, err = tr.Next() {
-		fmt.Println(h)
 		switch h.Typeflag {
 		case tar.TypeDir:
 			if err := os.Mkdir(fmt.Sprintf("%s/%s", path, h.Name), os.ModePerm); err != nil {
