@@ -253,7 +253,36 @@ var oko = cmd.Command{
 var removeCommand = cmd.Command{
 	Name:    "remove",
 	Aliases: []string{"r"},
-	Summary: "remove a package",
+	Summary: "remove packages",
+	Commands: []cmd.Command{
+		removeGitHubCommand,
+		removeLocalCommand,
+	},
+}
+
+var removeLocalCommand = cmd.Command{
+	Name:    "local",
+	Aliases: []string{"l"},
+	Summary: "remove a local package",
+	Args:    []string{"name"},
+	Method: func(args []string, _ map[string]string) error {
+		state, err := config.LoadPackageState("./oko.json")
+		if err != nil {
+			return fmt.Errorf("could not load `oko.json`: %s", err)
+		}
+
+		name := args[0]
+		if err := state.RemoveLocalPackage(name); err != nil {
+			return fmt.Errorf("could not remove package: %s", err)
+		}
+		return state.Save("./oko.json")
+	},
+}
+
+var removeGitHubCommand = cmd.Command{
+	Name:    "github",
+	Aliases: []string{"gh"},
+	Summary: "remove a github package",
 	Args:    []string{"name"},
 	Method: func(args []string, _ map[string]string) error {
 		state, err := config.LoadPackageState("./oko.json")

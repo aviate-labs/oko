@@ -203,6 +203,16 @@ func (s PackageState) Download() error {
 	return nil
 }
 
+func (s *PackageState) RemoveLocalPackage(name string) error {
+	for _, dep := range s.LocalDependencies {
+		if dep.Name == name {
+			delete(s.LocalDependencies, name)
+			return nil
+		}
+	}
+	return fmt.Errorf("package with name %q not found", name)
+}
+
 func (s PackageState) LocalDependencyList() []PackageInfoLocal {
 	var dependencies []PackageInfoLocal
 	for _, d := range s.LocalDependencies {

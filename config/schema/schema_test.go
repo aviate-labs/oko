@@ -23,6 +23,12 @@ func TestValidate(t *testing.T) {
 				"repository": "url",
 				"version": "v0.0.1"
 			}
+		],
+		"localDependencies": [
+			{
+				"name": "test",
+				"path": "path"
+			}
 		]
 	}`)); err != nil {
 		t.Error(err)

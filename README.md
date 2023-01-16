@@ -7,7 +7,7 @@
 ## Build
 
 ```shell
-make
+make build
 ```
 
 ## Features

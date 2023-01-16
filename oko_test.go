@@ -19,6 +19,7 @@ func TestOko(t *testing.T) {
 			{"Init", okoInit},
 			{"Download", okoDownload},
 			{"Install Local", okoInstallLocal},
+			{"Remove Local", okoRemoveLocal},
 		},
 		{
 			{"Migrate", okoMigrate},
@@ -62,6 +63,16 @@ func okoDownload(t *testing.T) {
 
 func okoInit(t *testing.T) {
 	args := []string{"init"}
+	if out, err := run(t, args...); err != nil {
+		t.Fatal(string(out), err)
+	}
+	if out, err := run(t, args...); err == nil {
+		t.Fatal(string(out))
+	}
+}
+
+func okoRemoveLocal(t *testing.T) {
+	args := []string{"r", "local", "src"}
 	if out, err := run(t, args...); err != nil {
 		t.Fatal(string(out), err)
 	}
