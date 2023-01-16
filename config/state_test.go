@@ -175,8 +175,8 @@ func TestPackageState_RemovePackage_otherDependency(t *testing.T) {
 		Dependencies: []string{"test"},
 	}, dep)
 	// There is a dependency on "test".
-	if err := state.RemovePackage("test"); err == nil {
-		t.Error()
+	if err := state.RemovePackage("test"); err != nil {
+		t.Error(err)
 	}
 
 	_ = state.AddPackage(config.PackageInfoRemote{
@@ -187,7 +187,7 @@ func TestPackageState_RemovePackage_otherDependency(t *testing.T) {
 	if err := state.RemovePackage("_"); err != nil {
 		t.Error(err)
 	}
-	if len(state.Dependencies) != 2 || len(state.TransitiveDependencies) != 0 {
+	if len(state.Dependencies) != 1 || len(state.TransitiveDependencies) != 1 {
 		t.Error(state.Dependencies, state.TransitiveDependencies)
 	}
 }

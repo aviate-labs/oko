@@ -26,6 +26,20 @@ func EmptyState() PackageState {
 	}
 }
 
+func (s PackageState) getDependencyByName(name string) *PackageInfoRemote {
+	for _, dep := range s.Dependencies {
+		if dep.Name == name {
+			return dep
+		}
+		for _, n := range dep.AlternativeNames {
+			if n == name {
+				return dep
+			}
+		}
+	}
+	return nil
+}
+
 func LoadPackageState(path string) (*PackageState, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -100,7 +114,10 @@ func (s *PackageState) AddPackage(pkg PackageInfoRemote, dependencies ...Package
 			s.Dependencies[pkg.Name] = &pkg
 		}
 	}
+	return s.addPackageDependencies(dependencies...)
+}
 
+func (s *PackageState) addPackageDependencies(dependencies ...PackageInfoRemote) error {
 	for _, dep := range dependencies {
 		p, same, err := s.Contains(dep)
 		if err != nil {
@@ -203,7 +220,13 @@ func (s *PackageState) RemovePackage(name string) error {
 			continue
 		}
 		if slices.Contains(dep.Dependencies, name) {
-			return fmt.Errorf("package %q depends on %q", dep.Name, name)
+			pkg := s.getDependencyByName(name)
+			if pkg == nil {
+				return fmt.Errorf("package %q depends on %q", dep.Name, name)
+			}
+			delete(s.Dependencies, pkg.Name)
+			s.TransitiveDependencies[pkg.Name] = pkg
+			return nil
 		}
 	}
 	for _, dep := range s.TransitiveDependencies {
