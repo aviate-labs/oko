@@ -15,13 +15,15 @@ import (
 )
 
 type Package struct {
-	CompilerVersion *string       `json:"compiler,omitempty"`
-	Dependencies    []PackageInfo `json:"dependencies"`
+	CompilerVersion        *string             `json:"compiler,omitempty"`
+	Dependencies           []PackageInfoRemote `json:"dependencies"`
+	LocalDependencies      []PackageInfoLocal  `json:"localDependencies,omitempty"`
+	TransitiveDependencies []PackageInfoRemote `json:"transitiveDependencies,omitempty"`
 }
 
 func EmptyPackage() Package {
 	return Package{
-		Dependencies: make([]PackageInfo, 0),
+		Dependencies: make([]PackageInfoRemote, 0),
 	}
 }
 
@@ -41,7 +43,7 @@ func NewPackage(raw []byte) (*Package, error) {
 	return &pkg, json.Unmarshal(raw, &pkg)
 }
 
-func (p *Package) Add(dependencies ...PackageInfo) {
+func (p *Package) Add(dependencies ...PackageInfoRemote) {
 	set := p.Set()
 	for _, dep := range dependencies {
 		if _, ok := set[dep.Name]; !ok {
@@ -51,17 +53,50 @@ func (p *Package) Add(dependencies ...PackageInfo) {
 	}
 }
 
-func (p *Package) Contains(info PackageInfo) (string, bool) {
+func (p *Package) AddDependency(dependencies ...PackageInfoRemote) {
+	set := p.SetTransitive()
+	for _, dep := range dependencies {
+		if _, ok := set[dep.Name]; !ok {
+			set[dep.Name] = dep
+			p.TransitiveDependencies = append(p.TransitiveDependencies, dep)
+		}
+	}
+}
+
+func (p *Package) AddLocal(dependencies ...PackageInfoLocal) {
+	set := p.SetLocal()
+	for _, dep := range dependencies {
+		if _, ok := set[dep.Name]; !ok {
+			set[dep.Name] = dep
+			p.LocalDependencies = append(p.LocalDependencies, dep)
+		}
+	}
+}
+
+func (p *Package) Contains(info PackageInfoRemote) (string, bool) {
 	for k, dep := range p.Dependencies {
-		if info.RelativePathDownload() == dep.RelativePathDownload() {
-			if info.Name != dep.Name {
-				dep.AddName(info.Name)
-				p.Dependencies[k] = dep
-			}
-			return dep.Name, true
+		if n, eq := p.Equals(info, k, dep); eq {
+			return n, eq
+		}
+	}
+	for k, dep := range p.TransitiveDependencies {
+		if n, eq := p.Equals(info, k, dep); eq {
+			return n, eq
 		}
 	}
 	return "", false
+}
+
+func (p *Package) ContainsLocal(info PackageInfoLocal) (string, error) {
+	for _, dep := range p.LocalDependencies {
+		if info.Path == dep.Path {
+			if info.Name != dep.Name {
+				return "", fmt.Errorf("local package %q already exists %q", info.Path, info.Name)
+			}
+			return dep.Name, nil
+		}
+	}
+	return "", nil
 }
 
 func (p Package) Download() error {
@@ -70,11 +105,33 @@ func (p Package) Download() error {
 			return err
 		}
 	}
+	for _, dep := range p.TransitiveDependencies {
+		if err := dep.Download(); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func (p *Package) Equals(info PackageInfoRemote, k int, dep PackageInfoRemote) (string, bool) {
+	if info.RelativePath() == dep.RelativePath() {
+		if info.GetName() != dep.GetName() {
+			dep.AddName(info.GetName())
+			p.Dependencies[k] = dep
+		}
+		return dep.Name, true
+	}
+	return "", false
 }
 
 func (p Package) Save(path string) error {
 	sort.Slice(p.Dependencies, func(i, j int) bool {
+		return strings.Compare(p.Dependencies[i].Name, p.Dependencies[j].Name) == -1
+	})
+	sort.Slice(p.LocalDependencies, func(i, j int) bool {
+		return strings.Compare(p.Dependencies[i].Name, p.Dependencies[j].Name) == -1
+	})
+	sort.Slice(p.TransitiveDependencies, func(i, j int) bool {
 		return strings.Compare(p.Dependencies[i].Name, p.Dependencies[j].Name) == -1
 	})
 	dataM, err := json.MarshalIndent(p, "", "\t")
@@ -84,28 +141,57 @@ func (p Package) Save(path string) error {
 	return os.WriteFile(path, dataM, os.ModePerm)
 }
 
-func (p Package) Set() map[string]PackageInfo {
-	var set = make(map[string]PackageInfo)
+func (p Package) Set() map[string]PackageInfoRemote {
+	var set = make(map[string]PackageInfoRemote)
 	for _, dep := range p.Dependencies {
 		set[dep.Name] = dep
 	}
 	return set
 }
 
-type PackageInfo struct {
+func (p Package) SetLocal() map[string]PackageInfoLocal {
+	var set = make(map[string]PackageInfoLocal)
+	for _, dep := range p.LocalDependencies {
+		set[dep.Name] = dep
+	}
+	return set
+}
+
+func (p Package) SetTransitive() map[string]PackageInfoRemote {
+	var set = make(map[string]PackageInfoRemote)
+	for _, dep := range p.TransitiveDependencies {
+		set[dep.Name] = dep
+	}
+	return set
+}
+
+type PackageInfo interface {
+	GetName() string
+	RelativePath() string
+}
+
+type PackageInfoLocal struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+func (p PackageInfoLocal) GetName() string {
+	return p.Name
+}
+
+func (p PackageInfoLocal) RelativePath() string {
+	return p.Path
+}
+
+type PackageInfoRemote struct {
 	Name             string   `json:"name"`
 	AlternativeNames []string `json:"alts,omitempty"`
-	Local            *bool    `json:"local,omitempty"`
 	Repository       string   `json:"repository"`
 	Version          string   `json:"version,omitempty"`
 	Dependencies     []string `json:"dependencies,omitempty"`
 }
 
-func (p PackageInfo) IsLocal() bool {
-	return p.Local != nil && *p.Local
-}
-
-func (p *PackageInfo) AddName(name string) {
+func (p *PackageInfoRemote) AddName(name string) {
 	for _, n := range p.AlternativeNames {
 		if n == name {
 			return
@@ -114,7 +200,7 @@ func (p *PackageInfo) AddName(name string) {
 	p.AlternativeNames = append(p.AlternativeNames, name)
 }
 
-func (p PackageInfo) Download() error {
+func (p PackageInfoRemote) Download() error {
 	raw, err := http.Get(fmt.Sprintf(
 		"%s/archive/%s/.tar.gz",
 		strings.TrimSuffix(p.Repository, ".git"), p.Version,
@@ -160,11 +246,11 @@ func (p PackageInfo) Download() error {
 	return nil
 }
 
-func (p PackageInfo) RelativePathDownload() string {
-	if p.IsLocal() {
-		return p.Repository
-	}
+func (p PackageInfoRemote) GetName() string {
+	return p.Name
+}
 
+func (p PackageInfoRemote) RelativePath() string {
 	repo := strings.TrimSuffix(p.Repository, ".git")
 	version := strings.TrimPrefix(p.Version, "v")
 	return fmt.Sprintf(".oko/%s-%s", repo[strings.LastIndex(repo, "/")+1:], version)

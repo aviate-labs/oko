@@ -13,19 +13,6 @@ import (
 
 const TEST_DIR = "e2e"
 
-func cleanup() {
-	if err := os.RemoveAll(TEST_DIR); err != nil {
-		panic(err)
-	}
-}
-
-func init() {
-	cleanup()
-	if err := os.Mkdir(TEST_DIR, os.ModePerm); err != nil && !os.IsExist(err) {
-		panic(err)
-	}
-}
-
 func TestVessel(t *testing.T) {
 	path, err := exec.LookPath("vessel")
 	if err != nil {
@@ -56,4 +43,17 @@ func TestVessel(t *testing.T) {
 	}
 
 	cleanup()
+}
+
+func cleanup() {
+	if err := os.RemoveAll(TEST_DIR); err != nil {
+		panic(err)
+	}
+}
+
+func init() {
+	cleanup()
+	if err := os.Mkdir(TEST_DIR, os.ModePerm); err != nil && !os.IsExist(err) {
+		panic(err)
+	}
 }

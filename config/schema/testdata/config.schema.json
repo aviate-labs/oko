@@ -11,38 +11,76 @@
             "type": "string"
         },
         "dependencies": {
+            "$ref": "/schemas/packages"
+        },
+        "localDependencies": {
+            "$ref": "/schemas/local/packages"
+        },
+        "transitiveDependencies": {
+            "$ref": "/schemas/packages"
+        }
+    },
+    "$defs": {
+        "packages": {
+            "$id": "/schemas/packages",
             "type": "array",
             "items": {
+                "$ref": "/schemas/package"
+            }
+        },
+        "package": {
+            "$id": "/schemas/package",
+            "type": "object",
+            "required": [
+                "name",
+                "repository",
+                "version"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "alts": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "repository": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "dependencies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "local": {
+            "packages": {
+                "$id": "/schemas/local/packages",
+                "type": "array",
+                "items": {
+                    "$ref": "/schemas/package"
+                }
+            },
+            "package": {
+                "$id": "/schemas/local/package",
                 "type": "object",
                 "required": [
                     "name",
-                    "repository",
-                    "version"
+                    "path"
                 ],
                 "properties": {
                     "name": {
                         "type": "string"
                     },
-                    "alts": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    },
-                    "local": {
-                        "type": "boolean"
-                    },
-                    "repository": {
+                    "path": {
                         "type": "string"
-                    },
-                    "version": {
-                        "type": "string"
-                    },
-                    "dependencies": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
                     }
                 }
             }

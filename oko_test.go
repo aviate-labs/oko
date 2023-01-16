@@ -58,12 +58,6 @@ func okoInit(t *testing.T) {
 	}
 }
 
-func run(t *testing.T, args ...string) ([]byte, error) {
-	cmd := exec.Command("./../oko", args...)
-	cmd.Dir = TEST_DIR
-	return cmd.CombinedOutput()
-}
-
 func okoInstallLocal(t *testing.T) {
 	args := []string{"i", "local", "src", "--name=src"}
 	if out, err := run(t, args...); err == nil {
@@ -75,4 +69,10 @@ func okoInstallLocal(t *testing.T) {
 	if out, err := run(t, args...); err != nil {
 		t.Fatal(string(out), err)
 	}
+}
+
+func run(t *testing.T, args ...string) ([]byte, error) {
+	cmd := exec.Command("./../oko", args...)
+	cmd.Dir = TEST_DIR
+	return cmd.CombinedOutput()
 }

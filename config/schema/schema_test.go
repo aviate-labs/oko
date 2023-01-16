@@ -11,18 +11,17 @@ func TestValidate(t *testing.T) {
 		t.Error()
 	}
 	if err := schema.Validate([]byte(`{
+		"dependencies": []
+	}`)); err != nil {
+		t.Error(err)
+	}
+	if err := schema.Validate([]byte(`{
 		"dependencies": [
 			{
 				"name": "test",
 				"alts": [ "t" ],
 				"repository": "url",
 				"version": "v0.0.1"
-			},
-			{
-				"name": "local",
-				"local": true,
-				"repository": "path",
-				"version": "*"
 			}
 		]
 	}`)); err != nil {

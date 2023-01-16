@@ -65,10 +65,10 @@ func (set PackageSet) Filter(packages []string) (PackageSet, error) {
 	return result, nil
 }
 
-func (set PackageSet) Oko() []config.PackageInfo {
-	var packages []config.PackageInfo
+func (set PackageSet) Oko() []config.PackageInfoRemote {
+	var packages []config.PackageInfoRemote
 	for _, pkg := range set.Packages {
-		packages = append(packages, config.PackageInfo{
+		packages = append(packages, config.PackageInfoRemote{
 			Name:         pkg.Name,
 			Repository:   pkg.Repo,
 			Version:      pkg.Version,

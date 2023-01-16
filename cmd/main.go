@@ -49,34 +49,33 @@ var installCommand = cmd.Command{
 	},
 }
 
-var installLocalCommand = cmd.Command{
-	Name:    "local",
-	Aliases: []string{"l"},
-	Summary: "install local packages",
-	Args:    []string{"path"},
+var installGitHubCommand = cmd.Command{
+	Name:    "github",
+	Aliases: []string{"gh"},
+	Summary: "install GitHub hosted packages",
+	Args:    []string{"url", "version"},
 	Options: []cmd.Option{
 		{
 			Name:     "name",
-			Summary:  "local path",
+			Summary:  "package name",
 			HasValue: true,
 		},
 	},
 	Method: func(args []string, options map[string]string) error {
-		path := args[0]
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return fmt.Errorf("could not find  %q", path)
+		url := args[0]
+		if !strings.HasPrefix(url, "github.com") {
+			return fmt.Errorf("url needs to start with `github.com`")
 		}
-		local := true
-		info := config.PackageInfo{
-			Repository: path,
-			Local:      &local,
-			Version:    "*",
+		version := args[1]
+		info := config.PackageInfoRemote{
+			Repository: fmt.Sprintf("https://%s", url),
+			Version:    version,
 		}
 
 		name, ok := options["name"]
 		if !ok {
 			// Ask for rename of package.
-			name := path[strings.LastIndex(path, "/")+1:]
+			name := url[strings.LastIndex(url, "/")+1:]
 			if cmd.AskForConfirmation(fmt.Sprintf("Do you want to rename the package name %q?", name)) {
 				info.Name = strings.TrimSpace(cmd.Ask("New name"))
 			} else {
@@ -93,46 +92,11 @@ var installLocalCommand = cmd.Command{
 		if _, ok := pkg.Contains(info); ok {
 			return fmt.Errorf("already added to `oko.json`")
 		}
-		pkg.Add(info)
-		return pkg.Save("./oko.json")
-	},
-}
-
-var installGitHubCommand = cmd.Command{
-	Name:    "github",
-	Aliases: []string{"gh"},
-	Summary: "install GitHub hosted packages",
-	Args:    []string{"url", "version"},
-	Method: func(args []string, _ map[string]string) error {
-		url := args[0]
-		if !strings.HasPrefix(url, "github.com") {
-			return fmt.Errorf("url needs to start with `github.com`")
-		}
-		version := args[1]
-		info := config.PackageInfo{
-			Repository: fmt.Sprintf("https://%s", url),
-			Version:    version,
-		}
-
-		// Ask for rename of package.
-		if name := url[strings.LastIndex(url, "/")+1:]; cmd.AskForConfirmation(fmt.Sprintf("Do you want to rename the package name %q?", name)) {
-			info.Name = strings.TrimSpace(cmd.Ask("New name"))
-		} else {
-			info.Name = name
-		}
-
-		pkg, err := config.LoadPackage("./oko.json")
-		if err != nil {
-			return fmt.Errorf("could not load `oko.json`: %s", err)
-		}
-		if _, ok := pkg.Contains(info); ok {
-			return fmt.Errorf("already added to `oko.json`")
-		}
 		if err := info.Download(); err != nil {
 			return err
 		}
 
-		if rawM, err := os.ReadFile(fmt.Sprintf("%s/vessel.dhall", info.RelativePathDownload())); err == nil {
+		if rawM, err := os.ReadFile(fmt.Sprintf("%s/vessel.dhall", info.RelativePath())); err == nil {
 			manifest, err := vessel.NewManifest(rawM)
 			if err != nil {
 				return err
@@ -141,9 +105,9 @@ var installGitHubCommand = cmd.Command{
 
 			// List of replaced dependency names.
 			var replaced = make(map[string]string)
-			var newPackages []config.PackageInfo
+			var newPackages []config.PackageInfoRemote
 			if len(manifest.Dependencies) != 0 {
-				packageSet, err := vessel.LoadPackageSet(fmt.Sprintf("%s/package-set.dhall", info.RelativePathDownload()))
+				packageSet, err := vessel.LoadPackageSet(fmt.Sprintf("%s/package-set.dhall", info.RelativePath()))
 				if err != nil {
 					return err
 				}
@@ -170,12 +134,12 @@ var installGitHubCommand = cmd.Command{
 					}
 				}
 			}
-			pkg.Add(newPackages...)
+			pkg.AddDependency(newPackages...)
 		} else {
 			if false {
 				// Check for Oko packages?
 			} else {
-				if _, err := os.Stat(fmt.Sprintf("%s/src", info.RelativePathDownload())); err != nil {
+				if _, err := os.Stat(fmt.Sprintf("%s/src", info.RelativePath())); err != nil {
 					fmt.Println("Invalid packages, no src directory found.")
 					return nil
 				}
@@ -183,6 +147,52 @@ var installGitHubCommand = cmd.Command{
 		}
 
 		pkg.Add(info)
+		return pkg.Save("./oko.json")
+	},
+}
+
+var installLocalCommand = cmd.Command{
+	Name:    "local",
+	Aliases: []string{"l"},
+	Summary: "install local packages",
+	Args:    []string{"path"},
+	Options: []cmd.Option{
+		{
+			Name:     "name",
+			Summary:  "package name",
+			HasValue: true,
+		},
+	},
+	Method: func(args []string, options map[string]string) error {
+		path := args[0]
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return fmt.Errorf("could not find  %q", path)
+		}
+		info := config.PackageInfoLocal{
+			Path: path,
+		}
+
+		name, ok := options["name"]
+		if !ok {
+			// Ask for rename of package.
+			name := path[strings.LastIndex(path, "/")+1:]
+			if cmd.AskForConfirmation(fmt.Sprintf("Do you want to rename the package name %q?", name)) {
+				info.Name = strings.TrimSpace(cmd.Ask("New name"))
+			} else {
+				info.Name = name
+			}
+		} else {
+			info.Name = name
+		}
+
+		pkg, err := config.LoadPackage("./oko.json")
+		if err != nil {
+			return fmt.Errorf("could not load `oko.json`: %s", err)
+		}
+		if _, err := pkg.ContainsLocal(info); err != nil {
+			return fmt.Errorf("already added to `oko.json`")
+		}
+		pkg.AddLocal(info)
 		return pkg.Save("./oko.json")
 	},
 }
@@ -263,21 +273,29 @@ var sourcesCommand = cmd.Command{
 
 		var sources []string
 		for _, dep := range pkg.Dependencies {
-			if dep.IsLocal() {
-				sources = append(sources, fmt.Sprintf(
-					"--package %s %s", dep.Name, dep.RelativePathDownload(),
-				))
-				continue
-			}
-
 			sources = append(sources, fmt.Sprintf(
-				"--package %s %s/src", dep.Name, dep.RelativePathDownload(),
+				"--package %s %s/src", dep.Name, dep.RelativePath(),
 			))
 			for _, name := range dep.AlternativeNames {
 				sources = append(sources, fmt.Sprintf(
-					"--package %s %s/src", name, dep.RelativePathDownload(),
+					"--package %s %s/src", name, dep.RelativePath(),
 				))
 			}
+		}
+		for _, dep := range pkg.TransitiveDependencies {
+			sources = append(sources, fmt.Sprintf(
+				"--package %s %s/src", dep.Name, dep.RelativePath(),
+			))
+			for _, name := range dep.AlternativeNames {
+				sources = append(sources, fmt.Sprintf(
+					"--package %s %s/src", name, dep.RelativePath(),
+				))
+			}
+		}
+		for _, dep := range pkg.LocalDependencies {
+			sources = append(sources, fmt.Sprintf(
+				"--package %s %s", dep.Name, dep.Path,
+			))
 		}
 		fmt.Print(strings.Join(sources, " "))
 		return nil
