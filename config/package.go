@@ -1,17 +1,14 @@
 package config
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"sort"
 	"strings"
 
 	"github.com/internet-computer/oko/config/schema"
+	"github.com/internet-computer/oko/internal/tar"
 )
 
 type Package struct {
@@ -113,6 +110,58 @@ func (p Package) Download() error {
 	return nil
 }
 
+func (p *Package) Remove(name string) error {
+	var index = -1
+	for i, dep := range p.LocalDependencies {
+		if dep.Name == name {
+			index = i
+			break
+		}
+	}
+	if index != -1 {
+		p.LocalDependencies = append(p.LocalDependencies[:index], p.LocalDependencies[index+1:]...)
+		return nil
+	}
+	for i, dep := range p.Dependencies {
+		if dep.Name == name {
+			index = i
+			break
+		}
+	}
+	if index != -1 {
+		p.Dependencies = append(p.Dependencies[:index], p.Dependencies[index+1:]...)
+		return nil
+	}
+	return fmt.Errorf("package not found: %s", name)
+}
+
+func (p *Package) Cleanup() error {
+	var transitiveDependencies []string
+	for _, dep := range p.Dependencies {
+		transitiveDependencies = append(transitiveDependencies, dep.Dependencies...)
+	}
+
+	result := make(map[string]PackageInfoRemote)
+	set := p.SetTransitive()
+	for len(transitiveDependencies) != 0 {
+		name := transitiveDependencies[0]
+		transitiveDependencies = transitiveDependencies[1:]
+		dep, ok := set[name]
+		if !ok {
+			return fmt.Errorf("missing transitive dependency: %q", name)
+		}
+		result[name] = dep
+		transitiveDependencies = append(transitiveDependencies, dep.Dependencies...)
+	}
+
+	var dependencies []PackageInfoRemote
+	for _, dep := range result {
+		dependencies = append(dependencies, dep)
+	}
+	p.TransitiveDependencies = dependencies
+	return nil
+}
+
 func (p *Package) Equals(info PackageInfoRemote, k int, dep PackageInfoRemote) (string, bool) {
 	if info.RelativePath() == dep.RelativePath() {
 		if info.GetName() != dep.GetName() {
@@ -124,15 +173,19 @@ func (p *Package) Equals(info PackageInfoRemote, k int, dep PackageInfoRemote) (
 	return "", false
 }
 
+func (p Package) HasPackages() bool {
+	return len(p.Dependencies) != 0 || len(p.LocalDependencies) != 0
+}
+
 func (p Package) Save(path string) error {
 	sort.Slice(p.Dependencies, func(i, j int) bool {
 		return strings.Compare(p.Dependencies[i].Name, p.Dependencies[j].Name) == -1
 	})
 	sort.Slice(p.LocalDependencies, func(i, j int) bool {
-		return strings.Compare(p.Dependencies[i].Name, p.Dependencies[j].Name) == -1
+		return strings.Compare(p.LocalDependencies[i].Name, p.LocalDependencies[j].Name) == -1
 	})
 	sort.Slice(p.TransitiveDependencies, func(i, j int) bool {
-		return strings.Compare(p.Dependencies[i].Name, p.Dependencies[j].Name) == -1
+		return strings.Compare(p.TransitiveDependencies[i].Name, p.TransitiveDependencies[j].Name) == -1
 	})
 	dataM, err := json.MarshalIndent(p, "", "\t")
 	if err != nil {
@@ -201,49 +254,13 @@ func (p *PackageInfoRemote) AddName(name string) {
 }
 
 func (p PackageInfoRemote) Download() error {
-	raw, err := http.Get(fmt.Sprintf(
-		"%s/archive/%s/.tar.gz",
-		strings.TrimSuffix(p.Repository, ".git"), p.Version,
-	))
-	if err != nil {
-		return err
-	}
-	if raw.StatusCode != 200 {
-		return fmt.Errorf("%d", raw.StatusCode)
-	}
-	if err := os.MkdirAll(".oko", os.ModePerm); err != nil {
-		return err
-	}
-	gzr, err := gzip.NewReader(raw.Body)
-	if err != nil {
-		return err
-	}
-	tr := tar.NewReader(gzr)
-	for h, err := tr.Next(); err == nil; h, err = tr.Next() {
-		switch h.Typeflag {
-		case tar.TypeDir:
-			if err := os.Mkdir(fmt.Sprintf(".oko/%s", h.Name), os.ModePerm); err != nil {
-				if os.IsExist(err) {
-					return nil
-				}
-
-				return err
-			}
-		case tar.TypeReg:
-			file, err := os.Create(fmt.Sprintf(".oko/%s", h.Name))
-			if err != nil {
-				return err
-			}
-			defer file.Close()
-			if _, err := io.Copy(file, tr); err != nil {
-				return err
-			}
-		}
-	}
-	if err != io.EOF {
-		return err
-	}
-	return nil
+	return tar.Download(
+		fmt.Sprintf(
+			"%s/archive/%s/.tar.gz",
+			strings.TrimSuffix(p.Repository, ".git"), p.Version,
+		),
+		".oko",
+	)
 }
 
 func (p PackageInfoRemote) GetName() string {

@@ -10,22 +10,37 @@ import (
 const TEST_DIR = "e2e"
 
 func TestOko(t *testing.T) {
-	for _, v := range []struct {
+	type Test struct {
 		Name string
 		T    func(*testing.T)
-	}{
-		{"Init", okoInit},
-		{"Download", okoDownload},
-		{"Install Local", okoInstallLocal},
-	} {
-		t.Run(v.Name, v.T)
 	}
-
+	for _, tests := range [][]Test{
+		{
+			{"Init", okoInit},
+			{"Download", okoDownload},
+			{"Install Local", okoInstallLocal},
+		},
+		{
+			{"Migrate", okoMigrate},
+		},
+	} {
+		for _, test := range tests {
+			t.Run(test.Name, test.T)
+		}
+		cleanupFiles()
+	}
 	cleanup()
 }
 
 func cleanup() {
 	if err := os.RemoveAll(TEST_DIR); err != nil {
+		panic(err)
+	}
+}
+
+func cleanupFiles() {
+	cleanup()
+	if err := os.Mkdir(TEST_DIR, os.ModePerm); err != nil && !os.IsExist(err) {
 		panic(err)
 	}
 }
@@ -36,25 +51,22 @@ func init() {
 		panic(err)
 	}
 
-	cleanup()
-	if err := os.Mkdir(TEST_DIR, os.ModePerm); err != nil && !os.IsExist(err) {
-		panic(err)
-	}
+	cleanupFiles()
 }
 
 func okoDownload(t *testing.T) {
-	if _, err := run(t, "download"); err != nil {
-		t.Fatal(err)
+	if out, err := run(t, "download"); err != nil {
+		t.Fatal(string(out), err)
 	}
 }
 
 func okoInit(t *testing.T) {
 	args := []string{"init"}
-	if _, err := run(t, args...); err != nil {
-		t.Fatal(err)
+	if out, err := run(t, args...); err != nil {
+		t.Fatal(string(out), err)
 	}
 	if out, err := run(t, args...); err == nil {
-		t.Error(string(out))
+		t.Fatal(string(out))
 	}
 }
 
@@ -68,6 +80,30 @@ func okoInstallLocal(t *testing.T) {
 	}
 	if out, err := run(t, args...); err != nil {
 		t.Fatal(string(out), err)
+	}
+	if out, err := run(t, args...); err == nil {
+		t.Fatal(string(out))
+	}
+}
+
+func okoMigrate(t *testing.T) {
+	path, err := exec.LookPath("vessel")
+	if err != nil {
+		t.Skip(err)
+	}
+
+	vessel := exec.Command(path, "init")
+	vessel.Dir = TEST_DIR
+	if out, err := vessel.CombinedOutput(); err != nil {
+		t.Fatal(string(out), err)
+	}
+
+	args := []string{"migrate", "--keep"}
+	if out, err := run(t, args...); err != nil {
+		t.Fatal(string(out), err)
+	}
+	if out, err := run(t, args...); err == nil {
+		t.Fatal(string(out))
 	}
 }
 

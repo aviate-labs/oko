@@ -12,6 +12,28 @@ import (
 
 const VERSION = "v0.0.0"
 
+var removeCommand = cmd.Command{
+	Name:    "remove",
+	Aliases: []string{"r"},
+	Summary: "remove a package",
+	Args:    []string{"name"},
+	Method: func(args []string, _ map[string]string) error {
+		pkg, err := config.LoadPackage("./oko.json")
+		if err != nil {
+			return fmt.Errorf("could not load `oko.json`: %s", err)
+		}
+
+		name := args[0]
+		if err := pkg.Remove(name); err != nil {
+			return err
+		}
+		if err := pkg.Cleanup(); err != nil {
+			return err
+		}
+		return pkg.Save("./oko.json")
+	},
+}
+
 var downloadCommand = cmd.Command{
 	Name:    "download",
 	Aliases: []string{"d"},
@@ -31,11 +53,22 @@ var downloadCommand = cmd.Command{
 var initCommand = cmd.Command{
 	Name:    "init",
 	Summary: "initialize Oko",
-	Method: func(_ []string, _ map[string]string) error {
+	Options: []cmd.Option{
+		{
+			Name:     "compiler",
+			Summary:  "compiler version",
+			HasValue: true,
+		},
+	},
+	Method: func(_ []string, options map[string]string) error {
 		if _, err := config.LoadPackage("./oko.json"); err == nil {
 			return fmt.Errorf("`oko.json` already exists: %s", err)
 		}
-		return config.EmptyPackage().Save("./oko.json")
+		pkg := config.EmptyPackage()
+		if v, ok := options["compiler"]; ok {
+			pkg.CompilerVersion = &v
+		}
+		return pkg.Save("./oko.json")
 	},
 }
 
@@ -115,15 +148,12 @@ var installGitHubCommand = cmd.Command{
 				if err != nil {
 					return err
 				}
-				for i, dep := range packages.Oko() {
+				for _, dep := range packages.Oko() {
 					if err := dep.Download(); err != nil {
 						return err
 					}
-					if name, exists := pkg.Contains(dep); !exists {
+					if _, exists := pkg.Contains(dep); !exists {
 						newPackages = append(newPackages, dep)
-					} else {
-						replaced[manifest.Dependencies[i]] = name
-						manifest.Dependencies[i] = name
 					}
 				}
 			}
@@ -214,6 +244,9 @@ var migrateCommand = cmd.Command{
 		if 2 <= len(options) {
 			return fmt.Errorf("can not use both `delete` and `keep` at the same time")
 		}
+		if pkg, err := config.LoadPackage("./oko.json"); err == nil && pkg.HasPackages() {
+			return fmt.Errorf("can not migrate vessel packages, `oko.json` already exists")
+		}
 
 		manifest, err := vessel.LoadManifest("./vessel.dhall")
 		if err != nil {
@@ -257,6 +290,7 @@ var oko = cmd.Command{
 		initCommand,
 		downloadCommand,
 		installCommand,
+		removeCommand,
 		migrateCommand,
 		sourcesCommand,
 	},

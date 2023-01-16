@@ -4,6 +4,12 @@
 
 ---
 
+## Build
+
+```shell
+make
+```
+
 ## Features
 
 ```shell
