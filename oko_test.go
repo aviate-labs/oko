@@ -46,7 +46,7 @@ func cleanupFiles() {
 }
 
 func init() {
-	cmd := exec.Command("make")
+	cmd := exec.Command("make", "build")
 	if err := cmd.Run(); err != nil {
 		panic(err)
 	}

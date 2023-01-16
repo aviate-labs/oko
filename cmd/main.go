@@ -12,38 +12,16 @@ import (
 
 const VERSION = "v0.0.0"
 
-var removeCommand = cmd.Command{
-	Name:    "remove",
-	Aliases: []string{"r"},
-	Summary: "remove a package",
-	Args:    []string{"name"},
-	Method: func(args []string, _ map[string]string) error {
-		pkg, err := config.LoadPackage("./oko.json")
-		if err != nil {
-			return fmt.Errorf("could not load `oko.json`: %s", err)
-		}
-
-		name := args[0]
-		if err := pkg.Remove(name); err != nil {
-			return err
-		}
-		if err := pkg.Cleanup(); err != nil {
-			return err
-		}
-		return pkg.Save("./oko.json")
-	},
-}
-
 var downloadCommand = cmd.Command{
 	Name:    "download",
 	Aliases: []string{"d"},
 	Summary: "download packages",
 	Method: func(_ []string, _ map[string]string) error {
-		pkg, err := config.LoadPackage("./oko.json")
+		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
 			return fmt.Errorf("could not load `oko.json`: %s", err)
 		}
-		if err := pkg.Download(); err != nil {
+		if err := state.Download(); err != nil {
 			return fmt.Errorf("could not download packages: %s", err)
 		}
 		return nil
@@ -61,14 +39,14 @@ var initCommand = cmd.Command{
 		},
 	},
 	Method: func(_ []string, options map[string]string) error {
-		if _, err := config.LoadPackage("./oko.json"); err == nil {
+		if _, err := config.LoadPackageState("./oko.json"); err == nil {
 			return fmt.Errorf("`oko.json` already exists: %s", err)
 		}
-		pkg := config.EmptyPackage()
+		state := config.EmptyState()
 		if v, ok := options["compiler"]; ok {
-			pkg.CompilerVersion = &v
+			state.CompilerVersion = &v
 		}
-		return pkg.Save("./oko.json")
+		return state.Save("./oko.json")
 	},
 }
 
@@ -118,27 +96,21 @@ var installGitHubCommand = cmd.Command{
 			info.Name = name
 		}
 
-		pkg, err := config.LoadPackage("./oko.json")
+		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
 			return fmt.Errorf("could not load `oko.json`: %s", err)
 		}
-		if _, ok := pkg.Contains(info); ok {
-			return fmt.Errorf("already added to `oko.json`")
-		}
+
 		if err := info.Download(); err != nil {
 			return err
 		}
-
 		if rawM, err := os.ReadFile(fmt.Sprintf("%s/vessel.dhall", info.RelativePath())); err == nil {
 			manifest, err := vessel.NewManifest(rawM)
 			if err != nil {
 				return err
 			}
 			info.Dependencies = manifest.Dependencies
-
-			// List of replaced dependency names.
-			var replaced = make(map[string]string)
-			var newPackages []config.PackageInfoRemote
+			var dependencies []config.PackageInfoRemote
 			if len(manifest.Dependencies) != 0 {
 				packageSet, err := vessel.LoadPackageSet(fmt.Sprintf("%s/package-set.dhall", info.RelativePath()))
 				if err != nil {
@@ -149,22 +121,10 @@ var installGitHubCommand = cmd.Command{
 					return err
 				}
 				for _, dep := range packages.Oko() {
-					if err := dep.Download(); err != nil {
-						return err
-					}
-					if _, exists := pkg.Contains(dep); !exists {
-						newPackages = append(newPackages, dep)
-					}
+					dependencies = append(dependencies, dep)
 				}
 			}
-			for _, dep := range newPackages {
-				for i, d := range dep.Dependencies {
-					if n, ok := replaced[d]; ok {
-						dep.Dependencies[i] = n
-					}
-				}
-			}
-			pkg.AddDependency(newPackages...)
+			state.AddPackage(info, dependencies...)
 		} else {
 			if false {
 				// Check for Oko packages?
@@ -174,10 +134,9 @@ var installGitHubCommand = cmd.Command{
 					return nil
 				}
 			}
+			state.AddPackage(info)
 		}
-
-		pkg.Add(info)
-		return pkg.Save("./oko.json")
+		return state.Save("./oko.json")
 	},
 }
 
@@ -215,15 +174,14 @@ var installLocalCommand = cmd.Command{
 			info.Name = name
 		}
 
-		pkg, err := config.LoadPackage("./oko.json")
+		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
 			return fmt.Errorf("could not load `oko.json`: %s", err)
 		}
-		if _, err := pkg.ContainsLocal(info); err != nil {
-			return fmt.Errorf("already added to `oko.json`")
+		if err := state.AddLocalPackage(info); err != nil {
+			return err
 		}
-		pkg.AddLocal(info)
-		return pkg.Save("./oko.json")
+		return state.Save("./oko.json")
 	},
 }
 
@@ -244,7 +202,7 @@ var migrateCommand = cmd.Command{
 		if 2 <= len(options) {
 			return fmt.Errorf("can not use both `delete` and `keep` at the same time")
 		}
-		if pkg, err := config.LoadPackage("./oko.json"); err == nil && pkg.HasPackages() {
+		if _, err := config.LoadPackageState("./oko.json"); err == nil {
 			return fmt.Errorf("can not migrate vessel packages, `oko.json` already exists")
 		}
 
@@ -296,17 +254,36 @@ var oko = cmd.Command{
 	},
 }
 
+var removeCommand = cmd.Command{
+	Name:    "remove",
+	Aliases: []string{"r"},
+	Summary: "remove a package",
+	Args:    []string{"name"},
+	Method: func(args []string, _ map[string]string) error {
+		state, err := config.LoadPackageState("./oko.json")
+		if err != nil {
+			return fmt.Errorf("could not load `oko.json`: %s", err)
+		}
+
+		name := args[0]
+		if err := state.RemovePackage(name); err != nil {
+			return fmt.Errorf("could not remove package: %s", err)
+		}
+		return state.Save("./oko.json")
+	},
+}
+
 var sourcesCommand = cmd.Command{
 	Name:    "sources",
 	Summary: "prints moc package sources",
 	Method: func(_ []string, _ map[string]string) error {
-		pkg, err := config.LoadPackage("./oko.json")
+		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
 			return fmt.Errorf("could not load `oko.json`: %s", err)
 		}
 
 		var sources []string
-		for _, dep := range pkg.Dependencies {
+		for _, dep := range state.Dependencies {
 			sources = append(sources, fmt.Sprintf(
 				"--package %s %s/src", dep.Name, dep.RelativePath(),
 			))
@@ -316,7 +293,7 @@ var sourcesCommand = cmd.Command{
 				))
 			}
 		}
-		for _, dep := range pkg.TransitiveDependencies {
+		for _, dep := range state.TransitiveDependencies {
 			sources = append(sources, fmt.Sprintf(
 				"--package %s %s/src", dep.Name, dep.RelativePath(),
 			))
@@ -326,7 +303,7 @@ var sourcesCommand = cmd.Command{
 				))
 			}
 		}
-		for _, dep := range pkg.LocalDependencies {
+		for _, dep := range state.LocalDependencies {
 			sources = append(sources, fmt.Sprintf(
 				"--package %s %s", dep.Name, dep.Path,
 			))

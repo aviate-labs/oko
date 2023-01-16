@@ -33,5 +33,6 @@ func (m Manifest) Oko(set PackageSet) config.Package {
 }
 
 func (m Manifest) Save(path string, set PackageSet) error {
-	return m.Oko(set).Save(path)
+	pkg := m.Oko(set)
+	return config.NewPackageState(&pkg).Save(path)
 }
