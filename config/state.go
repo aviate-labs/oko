@@ -26,20 +26,6 @@ func EmptyState() PackageState {
 	}
 }
 
-func (s PackageState) getDependencyByName(name string) *PackageInfoRemote {
-	for _, dep := range s.Dependencies {
-		if dep.Name == name {
-			return dep
-		}
-		for _, n := range dep.AlternativeNames {
-			if n == name {
-				return dep
-			}
-		}
-	}
-	return nil
-}
-
 func LoadPackageState(path string) (*PackageState, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -106,7 +92,7 @@ func (s *PackageState) AddPackage(pkg PackageInfoRemote, dependencies ...Package
 		}
 		if t != nil {
 			delete(s.TransitiveDependencies, t.Name)
-			if !same {
+			if !same && !slices.Contains(t.AlternativeNames, pkg.Name) {
 				t.AlternativeNames = append(t.AlternativeNames, pkg.Name)
 			}
 			s.Dependencies[t.Name] = t
@@ -115,34 +101,6 @@ func (s *PackageState) AddPackage(pkg PackageInfoRemote, dependencies ...Package
 		}
 	}
 	return s.addPackageDependencies(dependencies...)
-}
-
-func (s *PackageState) addPackageDependencies(dependencies ...PackageInfoRemote) error {
-	for _, dep := range dependencies {
-		p, same, err := s.Contains(dep)
-		if err != nil {
-			return err
-		}
-		if p != nil {
-			if !same {
-				p.AlternativeNames = append(p.AlternativeNames, dep.Name)
-			}
-		} else {
-			d, same, err := s.ContainsTransitive(dep)
-			if err != nil {
-				return err
-			}
-			if d != nil {
-				if !same {
-					d.AlternativeNames = append(d.AlternativeNames, dep.Name)
-				}
-			} else {
-				d := dep //copy
-				s.TransitiveDependencies[dep.Name] = &d
-			}
-		}
-	}
-	return nil
 }
 
 func (s PackageState) Contains(p PackageInfoRemote) (*PackageInfoRemote, bool, error) {
@@ -203,16 +161,6 @@ func (s PackageState) Download() error {
 	return nil
 }
 
-func (s *PackageState) RemoveLocalPackage(name string) error {
-	for _, dep := range s.LocalDependencies {
-		if dep.Name == name {
-			delete(s.LocalDependencies, name)
-			return nil
-		}
-	}
-	return fmt.Errorf("package with name %q not found", name)
-}
-
 func (s PackageState) LocalDependencyList() []PackageInfoLocal {
 	var dependencies []PackageInfoLocal
 	for _, d := range s.LocalDependencies {
@@ -222,6 +170,16 @@ func (s PackageState) LocalDependencyList() []PackageInfoLocal {
 		return strings.Compare(dependencies[i].Name, dependencies[j].Name) == -1
 	})
 	return dependencies
+}
+
+func (s *PackageState) RemoveLocalPackage(name string) error {
+	for _, dep := range s.LocalDependencies {
+		if dep.Name == name {
+			delete(s.LocalDependencies, name)
+			return nil
+		}
+	}
+	return fmt.Errorf("package with name %q not found", name)
 }
 
 func (s *PackageState) RemovePackage(name string) error {
@@ -300,6 +258,44 @@ func (s PackageState) TransitiveDependencyList() []PackageInfoRemote {
 		return strings.Compare(dependencies[i].Name, dependencies[j].Name) == -1
 	})
 	return dependencies
+}
+
+func (s *PackageState) addPackageDependencies(dependencies ...PackageInfoRemote) error {
+	for _, dep := range dependencies {
+		p, _, err := s.Contains(dep)
+		if err != nil {
+			return err
+		}
+		if p == nil {
+			d, same, err := s.ContainsTransitive(dep)
+			if err != nil {
+				return err
+			}
+			if d != nil {
+				if !same {
+					d.AlternativeNames = append(d.AlternativeNames, dep.Name)
+				}
+			} else {
+				d := dep //copy
+				s.TransitiveDependencies[dep.Name] = &d
+			}
+		}
+	}
+	return nil
+}
+
+func (s PackageState) getDependencyByName(name string) *PackageInfoRemote {
+	for _, dep := range s.Dependencies {
+		if dep.Name == name {
+			return dep
+		}
+		for _, n := range dep.AlternativeNames {
+			if n == name {
+				return dep
+			}
+		}
+	}
+	return nil
 }
 
 func (s *PackageState) removeTransitivePackage(name string) error {

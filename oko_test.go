@@ -71,16 +71,6 @@ func okoInit(t *testing.T) {
 	}
 }
 
-func okoRemoveLocal(t *testing.T) {
-	args := []string{"r", "local", "src"}
-	if out, err := run(t, args...); err != nil {
-		t.Fatal(string(out), err)
-	}
-	if out, err := run(t, args...); err == nil {
-		t.Fatal(string(out))
-	}
-}
-
 func okoInstallLocal(t *testing.T) {
 	args := []string{"i", "local", "src", "--name=src"}
 	if out, err := run(t, args...); err == nil {
@@ -110,6 +100,16 @@ func okoMigrate(t *testing.T) {
 	}
 
 	args := []string{"migrate", "--keep"}
+	if out, err := run(t, args...); err != nil {
+		t.Fatal(string(out), err)
+	}
+	if out, err := run(t, args...); err == nil {
+		t.Fatal(string(out))
+	}
+}
+
+func okoRemoveLocal(t *testing.T) {
+	args := []string{"r", "local", "src"}
 	if out, err := run(t, args...); err != nil {
 		t.Fatal(string(out), err)
 	}

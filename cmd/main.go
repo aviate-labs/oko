@@ -74,12 +74,9 @@ var installGitHubCommand = cmd.Command{
 	},
 	Method: func(args []string, options map[string]string) error {
 		url := args[0]
-		if !strings.HasPrefix(url, "github.com") {
-			return fmt.Errorf("url needs to start with `github.com`")
-		}
 		version := args[1]
 		info := config.PackageInfoRemote{
-			Repository: fmt.Sprintf("https://%s", url),
+			Repository: fmt.Sprintf("https://github.com/%s", url),
 			Version:    version,
 		}
 
@@ -253,17 +250,7 @@ var oko = cmd.Command{
 var removeCommand = cmd.Command{
 	Name:    "remove",
 	Aliases: []string{"r"},
-	Summary: "remove packages",
-	Commands: []cmd.Command{
-		removeGitHubCommand,
-		removeLocalCommand,
-	},
-}
-
-var removeLocalCommand = cmd.Command{
-	Name:    "local",
-	Aliases: []string{"l"},
-	Summary: "remove a local package",
+	Summary: "remove a package",
 	Args:    []string{"name"},
 	Method: func(args []string, _ map[string]string) error {
 		state, err := config.LoadPackageState("./oko.json")
@@ -272,25 +259,10 @@ var removeLocalCommand = cmd.Command{
 		}
 
 		name := args[0]
-		if err := state.RemoveLocalPackage(name); err != nil {
-			return fmt.Errorf("could not remove package: %s", err)
-		}
-		return state.Save("./oko.json")
-	},
-}
-
-var removeGitHubCommand = cmd.Command{
-	Name:    "github",
-	Aliases: []string{"gh"},
-	Summary: "remove a github package",
-	Args:    []string{"name"},
-	Method: func(args []string, _ map[string]string) error {
-		state, err := config.LoadPackageState("./oko.json")
-		if err != nil {
-			return fmt.Errorf("could not load `oko.json`: %s", err)
+		if err := state.RemoveLocalPackage(name); err == nil {
+			return state.Save("./oko.json")
 		}
 
-		name := args[0]
 		if err := state.RemovePackage(name); err != nil {
 			return fmt.Errorf("could not remove package: %s", err)
 		}
