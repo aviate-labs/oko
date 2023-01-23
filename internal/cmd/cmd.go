@@ -21,6 +21,8 @@ type Command struct {
 	Aliases []string
 	// A summary explaining the function of the command.
 	Summary string
+	// A longer description of the command.
+	Description string
 
 	// A list of sub commands.
 	Commands []Command

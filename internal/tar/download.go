@@ -72,7 +72,7 @@ func DownloadGz(url string, path string) error {
 		case tar.TypeDir:
 			if err := os.Mkdir(fmt.Sprintf("%s/%s", path, h.Name), os.ModePerm); err != nil {
 				if os.IsExist(err) {
-					return nil
+					continue
 				}
 				return err
 			}

@@ -3,19 +3,86 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/internet-computer/oko/config"
 	"github.com/internet-computer/oko/internal/cmd"
+	"github.com/internet-computer/oko/internal/tar"
 	"github.com/internet-computer/oko/vessel"
 )
 
 const VERSION = "v0.0.0"
 
-var downloadCommand = cmd.Command{
+var binCommand = cmd.Command{
+	Name:    "bin",
+	Aliases: []string{"b"},
+	Summary: "Motoko compiler stuff",
+	Commands: []cmd.Command{
+		binDownloadCommand,
+		binShowCommand,
+	},
+}
+
+var binDownloadCommand = cmd.Command{
 	Name:    "download",
 	Aliases: []string{"d"},
-	Summary: "download packages",
+	Summary: "downloads the Motoko compiler",
+	Method: func(_ []string, _ map[string]string) error {
+		pkg, err := config.LoadPackageState("./oko.json")
+		if err != nil {
+			return fmt.Errorf("`oko.json` already exists: %s", err)
+		}
+
+		if pkg.CompilerVersion == nil {
+			return fmt.Errorf("no compiler version specified in `oko.json`")
+		}
+		version := *pkg.CompilerVersion
+
+		goos := runtime.GOOS // TODO: improve w/ GOARCH
+		switch goos {
+		case "darwin":
+			goos = "macos"
+		case "linux":
+			goos = "linux64"
+		default:
+			return fmt.Errorf("unsupported runtime: %s", goos)
+		}
+
+		return tar.DownloadGz(
+			fmt.Sprintf(
+				"https://github.com/dfinity/motoko/releases/download/%s/motoko-%s-%s.tar.gz",
+				version, goos, version,
+			),
+			fmt.Sprintf(".oko/bin/%s", version),
+		)
+	},
+}
+
+var binShowCommand = cmd.Command{
+	Name:    "show",
+	Aliases: []string{"s"},
+	Summary: "prints out the path to the bin dir",
+	Method: func(args []string, options map[string]string) error {
+		pkg, err := config.LoadPackageState("./oko.json")
+		if err != nil {
+			return fmt.Errorf("`oko.json` already exists: %s", err)
+		}
+
+		if pkg.CompilerVersion == nil {
+			return fmt.Errorf("no compiler version specified in `oko.json`")
+		}
+		version := *pkg.CompilerVersion
+		fmt.Printf(".oko/bin/%s", version)
+		return nil
+	},
+}
+
+var downloadCommand = cmd.Command{
+	Name:        "download",
+	Aliases:     []string{"d"},
+	Summary:     "download packages",
+	Description: `Downloads all packages specified in the Oko package file.`,
 	Method: func(_ []string, _ map[string]string) error {
 		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
@@ -29,8 +96,9 @@ var downloadCommand = cmd.Command{
 }
 
 var initCommand = cmd.Command{
-	Name:    "init",
-	Summary: "initialize Oko",
+	Name:        "init",
+	Summary:     "initialize Oko",
+	Description: `Initializes the Oko package file.`,
 	Options: []cmd.Option{
 		{
 			Name:     "compiler",
@@ -51,9 +119,10 @@ var initCommand = cmd.Command{
 }
 
 var installCommand = cmd.Command{
-	Name:    "install",
-	Aliases: []string{"i"},
-	Summary: "install packages",
+	Name:        "install",
+	Aliases:     []string{"i"},
+	Summary:     "install packages",
+	Description: `Allows you to install packages from GitHub or link local directories.`,
 	Commands: []cmd.Command{
 		installGitHubCommand,
 		installLocalCommand,
@@ -64,7 +133,13 @@ var installGitHubCommand = cmd.Command{
 	Name:    "github",
 	Aliases: []string{"gh"},
 	Summary: "install GitHub hosted packages",
-	Args:    []string{"url", "version"},
+	Description: `
+Allows you to install packages from GitHub.
+	
+Expects {org}/{repo}, i.e. if you want to install the package at https://github.com/internet-computer/testing.mo you 
+will have to pass "internet-computer/testing.mo" to the first argument.
+`,
+	Args: []string{"url", "version"},
 	Options: []cmd.Option{
 		{
 			Name:     "name",
@@ -134,10 +209,11 @@ var installGitHubCommand = cmd.Command{
 }
 
 var installLocalCommand = cmd.Command{
-	Name:    "local",
-	Aliases: []string{"l"},
-	Summary: "install local packages",
-	Args:    []string{"path"},
+	Name:        "local",
+	Aliases:     []string{"l"},
+	Summary:     "install local packages",
+	Description: `Allows you to link local packages as dependencies.`,
+	Args:        []string{"path"},
 	Options: []cmd.Option{
 		{
 			Name:     "name",
@@ -179,8 +255,9 @@ var installLocalCommand = cmd.Command{
 }
 
 var migrateCommand = cmd.Command{
-	Name:    "migrate",
-	Summary: "migrate Vessel packages",
+	Name:        "migrate",
+	Summary:     "migrate Vessel packages",
+	Description: `Allows you to migrate Vessel config files to Oko.`,
 	Options: []cmd.Option{
 		{
 			Name:     "delete",
@@ -235,7 +312,7 @@ var migrateCommand = cmd.Command{
 
 var oko = cmd.Command{
 	Name:    "oko",
-	Summary: "TODO: fix me",
+	Summary: "A Package Manager",
 	Commands: []cmd.Command{
 		versionCommand,
 		initCommand,
@@ -244,14 +321,16 @@ var oko = cmd.Command{
 		removeCommand,
 		migrateCommand,
 		sourcesCommand,
+		binCommand,
 	},
 }
 
 var removeCommand = cmd.Command{
-	Name:    "remove",
-	Aliases: []string{"r"},
-	Summary: "remove a package",
-	Args:    []string{"name"},
+	Name:        "remove",
+	Aliases:     []string{"r"},
+	Summary:     "remove a package",
+	Description: `Allows you to remove packages by name.`,
+	Args:        []string{"name"},
 	Method: func(args []string, _ map[string]string) error {
 		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {

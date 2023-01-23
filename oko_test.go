@@ -109,7 +109,7 @@ func okoMigrate(t *testing.T) {
 }
 
 func okoRemoveLocal(t *testing.T) {
-	args := []string{"r", "local", "src"}
+	args := []string{"r", "src"}
 	if out, err := run(t, args...); err != nil {
 		t.Fatal(string(out), err)
 	}

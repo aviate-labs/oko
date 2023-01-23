@@ -6,7 +6,11 @@ import (
 )
 
 func (c Command) Help() {
-	fmt.Println(c.Summary)
+	if len(c.Description) == 0 {
+		fmt.Println(c.Summary)
+	} else {
+		fmt.Println(strings.TrimSpace(c.Description))
+	}
 	fmt.Println()
 	fmt.Printf("Usage:\n\t%s", c.Name)
 	if len(c.Commands) == 0 {
