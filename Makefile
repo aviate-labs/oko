@@ -1,6 +1,6 @@
-.PHONY: all build test testc format
+.PHONY: all build test testc format docs cmd
 
-all: format test
+all: format test docs
 
 build:
 	go build ./cmd/main.go
@@ -21,3 +21,8 @@ testc:
 format:
 	go fmt ./...
 	goarrange run -r .
+
+docs: cmd
+
+cmd:
+	go run cmd/manual/main.go > CMD.md
