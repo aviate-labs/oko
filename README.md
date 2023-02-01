@@ -1,6 +1,6 @@
 # Oko
 
-🚧 WIP
+🚧 **WIP** | Experimental 🚧
 
 ---
 

@@ -38,6 +38,8 @@ Allows you to install packages from GitHub.
 
 Expects `{org}/{repo}`, i.e. if you want to install the package at https://github.com/internet-computer/testing.mo you will have to pass `internet-computer/testing.mo` to the first argument.
 
+Instead of specifying a specific version, `latest` can be used.
+
 Name aliases: `gh`
 
 ```shell

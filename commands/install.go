@@ -1,11 +1,15 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/internet-computer/oko/config"
+	"github.com/internet-computer/oko/github"
 	"github.com/internet-computer/oko/internal/cmd"
 	"github.com/internet-computer/oko/vessel"
 )
@@ -26,7 +30,8 @@ var InstallGitHubCommand = cmd.Command{
 	Aliases: []string{"gh"},
 	Summary: "install GitHub hosted packages",
 	Description: "Allows you to install packages from GitHub.\n\n" +
-		"Expects `{org}/{repo}`, i.e. if you want to install the package at https://github.com/internet-computer/testing.mo you will have to pass `internet-computer/testing.mo` to the first argument.",
+		"Expects `{org}/{repo}`, i.e. if you want to install the package at https://github.com/internet-computer/testing.mo you will have to pass `internet-computer/testing.mo` to the first argument.\n\n" +
+		"Instead of specifying a specific version, `latest` can be used.",
 	Args: []string{"url", "version"},
 	Options: []cmd.Option{
 		{
@@ -38,6 +43,25 @@ var InstallGitHubCommand = cmd.Command{
 	Method: func(args []string, options map[string]string) error {
 		url := args[0]
 		version := args[1]
+		if version == "latest" {
+			resp, err := http.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases", url))
+			if err != nil {
+				return err
+			}
+			data, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			var releases []github.Release
+			if err := json.Unmarshal(data, &releases); err != nil {
+				return err
+			}
+			if len(releases) == 0 {
+				return fmt.Errorf("no releases found for %s", url)
+			}
+			version = releases[0].TagName
+		}
+
 		info := config.PackageInfoRemote{
 			Repository: fmt.Sprintf("https://github.com/%s", url),
 			Version:    version,
@@ -80,6 +104,8 @@ var InstallGitHubCommand = cmd.Command{
 					return err
 				}
 				state.AddPackage(info, packages.Oko()...)
+			} else {
+				state.AddPackage(info)
 			}
 		} else {
 			if false {
