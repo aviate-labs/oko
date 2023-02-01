@@ -4,6 +4,10 @@
 
 Initializes the Oko package file.
 
+```shell
+oko init
+```
+
 ### Options
 
 |name|value|
@@ -14,9 +18,17 @@ Initializes the Oko package file.
 
 Downloads all packages specified in the Oko package file.
 
+Name aliases: `d`
+
+```shell
+oko download
+```
+
 ## `install`
 
 Allows you to install packages from GitHub or link local directories.
+
+Name aliases: `i`
 
 ### Sub Commands
 
@@ -25,6 +37,12 @@ Allows you to install packages from GitHub or link local directories.
 Allows you to install packages from GitHub.
 
 Expects `{org}/{repo}`, i.e. if you want to install the package at https://github.com/internet-computer/testing.mo you will have to pass `internet-computer/testing.mo` to the first argument.
+
+Name aliases: `gh`
+
+```shell
+oko install github <url> <version>
+```
 
 ##### Arguments
 
@@ -41,6 +59,12 @@ Expects `{org}/{repo}`, i.e. if you want to install the package at https://githu
 
 Allows you to link local packages as dependencies.
 
+Name aliases: `l`
+
+```shell
+oko install local <path>
+```
+
 ##### Arguments
 
 1. path
@@ -55,6 +79,12 @@ Allows you to link local packages as dependencies.
 
 Allows you to remove packages by name.
 
+Name aliases: `r`
+
+```shell
+oko remove <name>
+```
+
 ### Arguments
 
 1. name
@@ -62,6 +92,10 @@ Allows you to remove packages by name.
 ## `migrate`
 
 Allows you to migrate Vessel config files to Oko.
+
+```shell
+oko migrate
+```
 
 ### Options
 
@@ -74,9 +108,15 @@ Allows you to migrate Vessel config files to Oko.
 
 prints moc package sources
 
+```shell
+oko sources
+```
+
 ## `bin`
 
 Motoko compiler stuff
+
+Name aliases: `b`
 
 ### Sub Commands
 
@@ -84,6 +124,18 @@ Motoko compiler stuff
 
 downloads the Motoko compiler
 
+Name aliases: `d`
+
+```shell
+oko bin download
+```
+
 #### `show`
 
 prints out the path to the bin dir
+
+Name aliases: `s`
+
+```shell
+oko bin show
+```

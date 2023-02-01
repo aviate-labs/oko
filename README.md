@@ -10,4 +10,6 @@
 make build
 ```
 
-## Commands[./CMD.md]
+## Commands
+
+See the full list [here](./CMD.md).
