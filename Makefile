@@ -21,6 +21,7 @@ testc:
 format:
 	go fmt ./...
 	goarrange run -r .
+	golangci-lint run -p error
 
 docs: cmd
 

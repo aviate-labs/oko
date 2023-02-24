@@ -7,6 +7,23 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
+type SchemaError struct {
+	Err error
+}
+
+func NewSchemaError(err error) *SchemaError {
+	return &SchemaError{
+		Err: err,
+	}
+}
+
+func (e SchemaError) Error() string {
+	return fmt.Sprintf(
+		"schema error: %s",
+		e.Err.Error(),
+	)
+}
+
 type ValidationError struct {
 	Errors []gojsonschema.ResultError
 }
@@ -22,5 +39,8 @@ func (e ValidationError) Error() string {
 	for _, err := range e.Errors {
 		messages = append(messages, err.Description())
 	}
-	return fmt.Sprintf("validation error:\n%s", strings.Join(messages, ", "))
+	return fmt.Sprintf(
+		"validation error: %s",
+		strings.Join(messages, ", "),
+	)
 }

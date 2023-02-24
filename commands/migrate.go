@@ -25,28 +25,28 @@ var MigrateCommand = cmd.Command{
 	},
 	Method: func(_ []string, options map[string]string) error {
 		if 2 <= len(options) {
-			return fmt.Errorf("can not use both `delete` and `keep` at the same time")
+			return NewMigrateError(NewOptionsError("can not use both `delete` and `keep` at the same time"))
 		}
 		if _, err := config.LoadPackageState("./oko.json"); err == nil {
-			return fmt.Errorf("can not migrate vessel packages, `oko.json` already exists")
+			return NewMigrateError(err)
 		}
 
 		manifest, err := vessel.LoadManifest("./vessel.dhall")
 		if err != nil {
-			return fmt.Errorf("could not read `vessel.dhall`: %s", err)
+			return NewMigrateError(err)
 		}
 		packageSet, err := vessel.LoadPackageSet("./package-set.dhall")
 		if err != nil {
-			return fmt.Errorf("could not read `package-set.dhall`: %s", err)
+			return NewMigrateError(err)
 		}
 
 		packages, err := packageSet.Filter(manifest.Dependencies)
 		if err != nil {
-			return fmt.Errorf("package set incomplete: %s", err)
+			return NewMigrateError(err)
 		}
 
 		if err := manifest.Save("./oko.json", packages); err != nil {
-			return fmt.Errorf("failed saving package set: %s", err)
+			return NewMigrateError(err)
 		}
 
 		// Optional delete.
@@ -55,12 +55,26 @@ var MigrateCommand = cmd.Command{
 		}
 		if _, ok := options["delete"]; ok || cmd.AskForConfirmation("Do you want to delete the `vessel.dhall` and `package-set.dhall` file?") {
 			if err := os.Remove("./vessel.dhall"); err != nil {
-				return err
+				return NewMigrateError(err)
 			}
 			if err := os.Remove("./package-set.dhall"); err != nil {
-				return err
+				return NewMigrateError(err)
 			}
 		}
 		return nil
 	},
+}
+
+type MigrateError struct {
+	Err error
+}
+
+func NewMigrateError(err error) *MigrateError {
+	return &MigrateError{
+		Err: err,
+	}
+}
+
+func (e MigrateError) Error() string {
+	return fmt.Sprintf("migrate error: %s", e.Err)
 }

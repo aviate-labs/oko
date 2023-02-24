@@ -16,17 +16,37 @@ var RemoveCommand = cmd.Command{
 	Method: func(args []string, _ map[string]string) error {
 		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
-			return fmt.Errorf("could not load `oko.json`: %s", err)
+			return NewRemoveError(err)
 		}
 
 		name := args[0]
 		if err := state.RemoveLocalPackage(name); err == nil {
-			return state.Save("./oko.json")
+			if err := state.Save("./oko.json"); err != nil {
+				return NewRemoveError(err)
+			}
+			return nil
 		}
 
 		if err := state.RemovePackage(name); err != nil {
-			return fmt.Errorf("could not remove package: %s", err)
+			return NewRemoveError(err)
 		}
-		return state.Save("./oko.json")
+		if err := state.Save("./oko.json"); err != nil {
+			return NewRemoveError(err)
+		}
+		return nil
 	},
+}
+
+type RemoveError struct {
+	Err error
+}
+
+func NewRemoveError(err error) *RemoveError {
+	return &RemoveError{
+		Err: err,
+	}
+}
+
+func (e RemoveError) Error() string {
+	return fmt.Sprintf("remove error: %s", e.Err)
 }

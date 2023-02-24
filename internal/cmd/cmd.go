@@ -59,11 +59,11 @@ func (c Command) checkArguments(args []string) error {
 
 		switch l {
 		case 0:
-			return fmt.Errorf("expected no argument")
+			return NewInvalidArgumentsError("expected no argument")
 		case 1:
-			return fmt.Errorf("expected 1 argument: %s", s[0])
+			return NewInvalidArgumentsError(fmt.Sprintf("expected 1 argument: %s", s[0]))
 		default:
-			return fmt.Errorf("expected %d argument(s): %s", len(c.Args), strings.Join(s, " "))
+			return NewInvalidArgumentsError(fmt.Sprintf("expected %d argument(s): %s", len(c.Args), strings.Join(s, " ")))
 		}
 	}
 	return nil
@@ -80,7 +80,7 @@ func (c Command) command(name string, args []string) error {
 		}
 	}
 	if cmd.Name == "" {
-		return fmt.Errorf("command not found")
+		return NewCommandNotFoundError()
 	}
 	return cmd.Call(args...)
 }

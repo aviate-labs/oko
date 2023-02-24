@@ -1,6 +1,7 @@
 package vessel_test
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -29,15 +30,11 @@ func TestVessel(t *testing.T) {
 	}
 
 	if _, err := vessel.LoadPackageSet(fmt.Sprintf("%s/package-set.dhall", TEST_DIR)); err != nil {
-		switch err := err.(type) {
-		case *url.Error:
-			switch err := err.Err.(type) {
-			case *net.OpError:
-				t.Skip(err)
-			default:
-				t.Error(err)
-			}
-		default:
+		var urlErr *url.Error
+		var opErr *net.OpError
+		if errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) {
+			t.Skip(err)
+		} else {
 			t.Error(err)
 		}
 	}

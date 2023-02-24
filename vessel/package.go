@@ -22,7 +22,7 @@ type PackageSet struct {
 func LoadPackageSet(path string) (*PackageSet, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, NewVesselError(err)
 	}
 	return NewPackageSet(raw)
 }
@@ -35,7 +35,7 @@ func NewPackageSet(raw []byte) (*PackageSet, error) {
 		list []Package
 	)
 	if err := dhall.Unmarshal(raw, &list); err != nil {
-		return nil, err
+		return nil, NewVesselError(err)
 	}
 	for _, pkg := range list {
 		if v, ok := set.Packages[pkg.Name]; ok {

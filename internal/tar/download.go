@@ -3,6 +3,7 @@ package tar
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,17 +13,17 @@ import (
 func Download(url string, path string) error {
 	raw, err := http.Get(url)
 	if err != nil {
-		return err
+		return NewTarError(err)
 	}
 	if raw.StatusCode != 200 {
-		return fmt.Errorf("%d", raw.StatusCode)
+		return NewUnexpectedStatusCodeError(raw.StatusCode)
 	}
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
-		return err
+		return NewTarError(err)
 	}
 	gzr, err := gzip.NewReader(raw.Body)
 	if err != nil {
-		return err
+		return NewTarError(err)
 	}
 	tr := tar.NewReader(gzr)
 	for h, err := tr.Next(); err == nil; h, err = tr.Next() {
@@ -32,21 +33,21 @@ func Download(url string, path string) error {
 				if os.IsExist(err) {
 					return nil
 				}
-				return err
+				return NewTarError(err)
 			}
 		case tar.TypeReg:
 			file, err := os.Create(fmt.Sprintf("%s/%s", path, h.Name))
 			if err != nil {
-				return err
+				return NewTarError(err)
 			}
 			defer file.Close()
 			if _, err := io.Copy(file, tr); err != nil {
-				return err
+				return NewTarError(err)
 			}
 		}
 	}
-	if err != io.EOF {
-		return err
+	if errors.Is(err, io.EOF) {
+		return NewTarError(err)
 	}
 	return nil
 }
@@ -54,17 +55,17 @@ func Download(url string, path string) error {
 func DownloadGz(url string, path string) error {
 	raw, err := http.Get(url)
 	if err != nil {
-		return err
+		return NewTarError(err)
 	}
 	if raw.StatusCode != 200 {
-		return fmt.Errorf("%d", raw.StatusCode)
+		return NewUnexpectedStatusCodeError(raw.StatusCode)
 	}
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
-		return err
+		return NewTarError(err)
 	}
 	gzr, err := gzip.NewReader(raw.Body)
 	if err != nil {
-		return err
+		return NewTarError(err)
 	}
 	tr := tar.NewReader(gzr)
 	for h, err := tr.Next(); err == nil; h, err = tr.Next() {
@@ -74,21 +75,21 @@ func DownloadGz(url string, path string) error {
 				if os.IsExist(err) {
 					continue
 				}
-				return err
+				return NewTarError(err)
 			}
 		case tar.TypeReg:
 			file, err := os.Create(fmt.Sprintf("%s/%s", path, h.Name))
 			if err != nil {
-				return err
+				return NewTarError(err)
 			}
 			defer file.Close()
 			if _, err := io.Copy(file, tr); err != nil {
-				return err
+				return NewTarError(err)
 			}
 		}
 	}
-	if err != io.EOF {
-		return err
+	if errors.Is(err, io.EOF) {
+		return NewTarError(err)
 	}
 	return nil
 }

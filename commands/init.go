@@ -20,12 +20,29 @@ var InitCommand = cmd.Command{
 	},
 	Method: func(_ []string, options map[string]string) error {
 		if _, err := config.LoadPackageState("./oko.json"); err == nil {
-			return fmt.Errorf("`oko.json` already exists: %s", err)
+			return NewInitError(err)
 		}
 		state := config.EmptyState()
 		if v, ok := options["compiler"]; ok {
 			state.CompilerVersion = &v
 		}
-		return state.Save("./oko.json")
+		if err := state.Save("./oko.json"); err != nil {
+			return NewInitError(err)
+		}
+		return nil
 	},
+}
+
+type InitError struct {
+	Err error
+}
+
+func NewInitError(err error) *InitError {
+	return &InitError{
+		Err: err,
+	}
+}
+
+func (e InitError) Error() string {
+	return fmt.Sprintf("init error: %s", e.Err)
 }

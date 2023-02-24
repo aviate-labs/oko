@@ -26,11 +26,11 @@ var BinDownloadCommand = cmd.Command{
 	Method: func(_ []string, _ map[string]string) error {
 		pkg, err := config.LoadPackageState("./oko.json")
 		if err != nil {
-			return fmt.Errorf("`oko.json` already exists: %s", err)
+			return NewBinError(err)
 		}
 
 		if pkg.CompilerVersion == nil {
-			return fmt.Errorf("no compiler version specified in `oko.json`")
+			return NewBinError(NewCompilerVersionNotFoundError())
 		}
 		version := *pkg.CompilerVersion
 
@@ -41,16 +41,19 @@ var BinDownloadCommand = cmd.Command{
 		case "linux":
 			goos = "linux64"
 		default:
-			return fmt.Errorf("unsupported runtime: %s", goos)
+			return NewBinError(NewUnsupportedRuntimeErrors(goos))
 		}
 
-		return tar.DownloadGz(
+		if err := tar.DownloadGz(
 			fmt.Sprintf(
 				"https://github.com/dfinity/motoko/releases/download/%s/motoko-%s-%s.tar.gz",
 				version, goos, version,
 			),
 			fmt.Sprintf(".oko/bin/%s", version),
-		)
+		); err != nil {
+			return NewBinError(err)
+		}
+		return nil
 	},
 }
 
@@ -61,14 +64,52 @@ var BinShowCommand = cmd.Command{
 	Method: func(args []string, options map[string]string) error {
 		pkg, err := config.LoadPackageState("./oko.json")
 		if err != nil {
-			return fmt.Errorf("`oko.json` does not exist: %s", err)
+			return NewBinError(err)
 		}
 
 		if pkg.CompilerVersion == nil {
-			return fmt.Errorf("no compiler version specified in `oko.json`")
+			return NewBinError(NewCompilerVersionNotFoundError())
 		}
 		version := *pkg.CompilerVersion
 		fmt.Printf(".oko/bin/%s", version)
 		return nil
 	},
+}
+
+type BinError struct {
+	Err error
+}
+
+func NewBinError(err error) *BinError {
+	return &BinError{
+		Err: err,
+	}
+}
+
+func (e BinError) Error() string {
+	return fmt.Sprintf("bin error: %s", e.Err)
+}
+
+type CompilerVersionNotFoundError struct{}
+
+func NewCompilerVersionNotFoundError() *CompilerVersionNotFoundError {
+	return &CompilerVersionNotFoundError{}
+}
+
+func (e CompilerVersionNotFoundError) Error() string {
+	return "no compiler version specified"
+}
+
+type UnsupportedRuntimeErrors struct {
+	GOOS string
+}
+
+func NewUnsupportedRuntimeErrors(goos string) *UnsupportedRuntimeErrors {
+	return &UnsupportedRuntimeErrors{
+		GOOS: goos,
+	}
+}
+
+func (e UnsupportedRuntimeErrors) Error() string {
+	return fmt.Sprintf("unsupported runtime: %s", e.GOOS)
 }

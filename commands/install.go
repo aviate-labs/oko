@@ -46,18 +46,18 @@ var InstallGitHubCommand = cmd.Command{
 		if version == "latest" {
 			resp, err := http.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases", url))
 			if err != nil {
-				return err
+				return NewInstallError(err)
 			}
 			data, err := io.ReadAll(resp.Body)
 			if err != nil {
-				return err
+				return NewInstallError(err)
 			}
 			var releases []github.Release
 			if err := json.Unmarshal(data, &releases); err != nil {
-				return err
+				return NewInstallError(err)
 			}
 			if len(releases) == 0 {
-				return fmt.Errorf("no releases found for %s", url)
+				return NewInstallError(github.NewReleasesNotFoundErrors(url))
 			}
 			version = releases[0].TagName
 		}
@@ -82,43 +82,69 @@ var InstallGitHubCommand = cmd.Command{
 
 		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
-			return fmt.Errorf("could not load `oko.json`: %s", err)
+			return NewInstallError(err)
 		}
 
 		if err := info.Download(); err != nil {
-			return err
+			return NewInstallError(err)
 		}
-		if rawM, err := os.ReadFile(fmt.Sprintf("%s/vessel.dhall", info.RelativePath())); err == nil {
-			manifest, err := vessel.NewManifest(rawM)
+
+		// VESSEL
+		if raw, err := os.ReadFile(fmt.Sprintf("%s/vessel.dhall", info.RelativePath())); err == nil {
+			manifest, err := vessel.NewManifest(raw)
 			if err != nil {
-				return err
+				return NewInstallError(err)
 			}
 			info.Dependencies = manifest.Dependencies
 			if len(manifest.Dependencies) != 0 {
 				packageSet, err := vessel.LoadPackageSet(fmt.Sprintf("%s/package-set.dhall", info.RelativePath()))
 				if err != nil {
-					return err
+					return NewInstallError(err)
 				}
 				packages, err := packageSet.Filter(manifest.Dependencies)
 				if err != nil {
-					return err
+					return NewInstallError(err)
 				}
-				state.AddPackage(info, packages.Oko()...)
+				if err := state.AddPackage(info, packages.Oko()...); err != nil {
+					return NewInstallError(err)
+				}
 			} else {
-				state.AddPackage(info)
-			}
-		} else {
-			if false {
-				// Check for Oko packages?
-			} else {
-				if _, err := os.Stat(fmt.Sprintf("%s/src", info.RelativePath())); err != nil {
-					fmt.Println("Invalid packages, no src directory found.")
+				if err := state.AddPackage(info); err != nil {
 					return nil
 				}
 			}
-			state.AddPackage(info)
+			if err := state.Save("./oko.json"); err != nil {
+				return NewInstallError(err)
+			}
+			return nil
 		}
-		return state.Save("./oko.json")
+
+		// OKO
+		if raw, err := os.ReadFile(fmt.Sprintf("%s/oko.json", info.RelativePath())); err == nil {
+			pkg, err := config.NewPackageConfig(raw)
+			if err != nil {
+				return NewInstallError(err)
+			}
+			if err := state.LoadState(config.NewPackageState(pkg)); err != nil {
+				return NewInstallError(err)
+			}
+			if err := state.Save("./oko.json"); err != nil {
+				return NewInstallError(err)
+			}
+			return nil
+		}
+
+		// No `vessel.dhall` or `oko.json`.
+		if _, err := os.Stat(fmt.Sprintf("%s/src", info.RelativePath())); err != nil {
+			return NewInstallError(err)
+		}
+		if err := state.AddPackage(info); err != nil {
+			return NewInstallError(err)
+		}
+		if err := state.Save("./oko.json"); err != nil {
+			return NewInstallError(err)
+		}
+		return nil
 	},
 }
 
@@ -137,8 +163,8 @@ var InstallLocalCommand = cmd.Command{
 	},
 	Method: func(args []string, options map[string]string) error {
 		path := args[0]
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return fmt.Errorf("could not find  %q", path)
+		if _, err := os.Stat(path); err != nil {
+			return NewInstallError(err)
 		}
 		info := config.PackageInfoLocal{
 			Path: path,
@@ -159,11 +185,28 @@ var InstallLocalCommand = cmd.Command{
 
 		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
-			return fmt.Errorf("could not load `oko.json`: %s", err)
+			return NewInstallError(err)
 		}
 		if err := state.AddLocalPackage(info); err != nil {
-			return err
+			return NewInstallError(err)
 		}
-		return state.Save("./oko.json")
+		if err := state.Save("./oko.json"); err != nil {
+			return NewInstallError(err)
+		}
+		return nil
 	},
+}
+
+type InstallError struct {
+	Err error
+}
+
+func NewInstallError(err error) *InstallError {
+	return &InstallError{
+		Err: err,
+	}
+}
+
+func (e InstallError) Error() string {
+	return fmt.Sprintf("install error %s", e.Err)
 }

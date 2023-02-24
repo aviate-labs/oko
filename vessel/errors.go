@@ -38,3 +38,17 @@ func (e MissingPackageDependencyError) Error() string {
 		e.dependency,
 	)
 }
+
+type VesselError struct {
+	Err error
+}
+
+func NewVesselError(err error) *VesselError {
+	return &VesselError{
+		Err: err,
+	}
+}
+
+func (e VesselError) Error() string {
+	return fmt.Sprintf("vessel error: %s", e.Err)
+}

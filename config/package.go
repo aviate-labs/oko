@@ -2,16 +2,21 @@ package config
 
 import (
 	"encoding/json"
+
+	"github.com/internet-computer/oko/internal"
 )
 
-type Package struct {
+type PackageConfig struct {
 	CompilerVersion        *string             `json:"compiler,omitempty"`
 	Dependencies           []PackageInfoRemote `json:"dependencies"`
 	LocalDependencies      []PackageInfoLocal  `json:"localDependencies,omitempty"`
 	TransitiveDependencies []PackageInfoRemote `json:"transitiveDependencies,omitempty"`
 }
 
-func NewPackage(raw []byte) (*Package, error) {
-	var pkg Package
-	return &pkg, json.Unmarshal(raw, &pkg)
+func NewPackageConfig(raw []byte) (*PackageConfig, error) {
+	var pkg PackageConfig
+	if err := json.Unmarshal(raw, &pkg); err != nil {
+		return nil, internal.Error(err)
+	}
+	return &pkg, nil
 }

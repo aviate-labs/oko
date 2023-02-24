@@ -13,6 +13,7 @@ func (p PackageInfoLocal) RelativePath() string {
 	return p.Path
 }
 
+// equals returns true if both the name and path.
 func (p PackageInfoLocal) equals(o PackageInfoLocal) bool {
 	return p.Name == o.Name && p.Path == o.Path
 }

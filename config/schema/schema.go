@@ -14,7 +14,7 @@ var schemaLoader gojsonschema.JSONLoader
 func Validate(raw []byte) error {
 	result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewBytesLoader(raw))
 	if err != nil {
-		return err
+		return NewSchemaError(err)
 	}
 	if !result.Valid() {
 		return NewValidationError(result.Errors())

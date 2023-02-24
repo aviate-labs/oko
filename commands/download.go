@@ -15,11 +15,25 @@ var DownloadCommand = cmd.Command{
 	Method: func(_ []string, _ map[string]string) error {
 		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
-			return fmt.Errorf("could not load `oko.json`: %s", err)
+			return NewDownloadError(err)
 		}
 		if err := state.Download(); err != nil {
-			return fmt.Errorf("could not download packages: %s", err)
+			return NewDownloadError(err)
 		}
 		return nil
 	},
+}
+
+type DownloadError struct {
+	Err error
+}
+
+func NewDownloadError(err error) *DownloadError {
+	return &DownloadError{
+		Err: err,
+	}
+}
+
+func (e DownloadError) Error() string {
+	return fmt.Sprintf("download error: %s", e.Err)
 }

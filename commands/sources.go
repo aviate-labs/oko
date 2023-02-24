@@ -14,7 +14,7 @@ var SourcesCommand = cmd.Command{
 	Method: func(_ []string, _ map[string]string) error {
 		state, err := config.LoadPackageState("./oko.json")
 		if err != nil {
-			return fmt.Errorf("could not load `oko.json`: %s", err)
+			return NewSourcesError(err)
 		}
 
 		var sources []string
@@ -46,4 +46,18 @@ var SourcesCommand = cmd.Command{
 		fmt.Print(strings.Join(sources, " "))
 		return nil
 	},
+}
+
+type SourcesError struct {
+	Err error
+}
+
+func NewSourcesError(err error) *SourcesError {
+	return &SourcesError{
+		Err: err,
+	}
+}
+
+func (e SourcesError) Error() string {
+	return fmt.Sprintf("sources error: %s", e.Err)
 }

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/internet-computer/oko/internal"
 	"github.com/internet-computer/oko/internal/tar"
+	"golang.org/x/exp/slices"
 )
 
 type PackageInfoRemote struct {
@@ -25,13 +27,16 @@ func (p *PackageInfoRemote) AddName(name string) {
 }
 
 func (p PackageInfoRemote) Download() error {
-	return tar.Download(
+	if err := tar.Download(
 		fmt.Sprintf(
 			"%s/archive/%s/.tar.gz",
 			strings.TrimSuffix(p.Repository, ".git"), p.Version,
 		),
 		".oko",
-	)
+	); err != nil {
+		return internal.Error(err)
+	}
+	return nil
 }
 
 func (p PackageInfoRemote) GetName() string {
@@ -44,19 +49,24 @@ func (p PackageInfoRemote) RelativePath() string {
 	return fmt.Sprintf(".oko/%s-%s", repo[strings.LastIndex(repo, "/")+1:], version)
 }
 
+// equals returns true if both the repository and version match.
 func (p PackageInfoRemote) equals(o PackageInfoRemote) bool {
 	return p.Repository == o.Repository && p.Version == o.Version
 }
 
-func (p PackageInfoRemote) sameName(o PackageInfoRemote) bool {
+// hashName returns true if either it has the same name, or an alternative name matches.
+func (p PackageInfoRemote) hasName(name string) bool {
+	return p.Name == name || slices.Contains(p.AlternativeNames, name)
+}
+
+// hasSameName returns true if either both have the same name, or an alternative name matches.
+func (p PackageInfoRemote) hasSameName(o PackageInfoRemote) bool {
 	if p.Name == o.Name {
 		return true
 	}
 	for _, p := range p.AlternativeNames {
-		for _, o := range o.AlternativeNames {
-			if p == o {
-				return true
-			}
+		if slices.Contains(o.AlternativeNames, p) {
+			return true
 		}
 	}
 	return false

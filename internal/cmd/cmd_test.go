@@ -37,7 +37,7 @@ func ExampleCommand_Help() {
 }
 
 func ExampleCommand_Help_sub() {
-	c.Call("sub", "help")
+	_ = c.Call("sub", "help")
 	// Output:
 	// Usage:
 	//	sub <c>
@@ -48,11 +48,11 @@ func ExampleCommand_Help_sub() {
 }
 
 func ExampleCommand_Help_subC() {
-	c.Call("sub", "c")
-	c.Call("sub", "--all", "c")
-	c.Call("sub", "c", "--all")
-	c.Call("sub", "c", "--v=0")
-	c.Call("sub", "--v", "0", "c")
+	_ = c.Call("sub", "c")
+	_ = c.Call("sub", "--all", "c")
+	_ = c.Call("sub", "c", "--all")
+	_ = c.Call("sub", "c", "--v=0")
+	_ = c.Call("sub", "--v", "0", "c")
 	// Output:
 	// [c] map[]
 	// [c] map[all:]

@@ -8,7 +8,7 @@ import (
 )
 
 func ExamplePackageState() {
-	json, _ := config.EmptyState().ToJSON()
+	json, _ := config.EmptyState().MarshalJSON()
 	fmt.Println(string(json))
 	// Output:
 	// {
@@ -23,7 +23,7 @@ func ExamplePackageState_AddPackage() {
 		Repository: "url",
 		Version:    "*",
 	})
-	json, _ := state.ToJSON()
+	json, _ := state.MarshalJSON()
 	fmt.Println(string(json))
 	// Output:
 	// {
@@ -48,7 +48,7 @@ func ExamplePackageState_AddPackage_alreadyExits() {
 	_ = state.AddPackage(config.PackageInfoRemote{
 		Dependencies: []string{"test"},
 	}, dep)
-	json, _ := state.ToJSON()
+	json, _ := state.MarshalJSON()
 	fmt.Println(string(json))
 	// Output:
 	// {
@@ -83,10 +83,10 @@ func ExamplePackageState_AddPackage_fromTransitive() {
 		Version:      "v0.1.0",
 		Dependencies: []string{"test"},
 	}, dep)
-	json, _ := state.ToJSON()
+	json, _ := state.MarshalJSON()
 	fmt.Println(string(json))
 	_ = state.AddPackage(dep)
-	json, _ = state.ToJSON()
+	json, _ = state.MarshalJSON()
 	fmt.Println(string(json))
 	// Output:
 	// {
@@ -127,6 +127,29 @@ func ExamplePackageState_AddPackage_fromTransitive() {
 	// }
 }
 
+func ExamplePackageState_LoadState() {
+	state := config.EmptyState()
+	_ = state.AddPackage(config.PackageInfoRemote{
+		Name:       "test",
+		Repository: "url",
+		Version:    "*",
+	})
+	other := config.EmptyState()
+	_ = state.LoadState(&other)
+	json, _ := state.MarshalJSON()
+	fmt.Println(string(json))
+	// Output:
+	// {
+	// 	"dependencies": [
+	// 		{
+	// 			"name": "test",
+	// 			"repository": "url",
+	// 			"version": "*"
+	// 		}
+	// 	]
+	// }
+}
+
 func ExamplePackageState_RemovePackage() {
 	state := config.EmptyState()
 	_ = state.AddPackage(config.PackageInfoRemote{
@@ -135,7 +158,7 @@ func ExamplePackageState_RemovePackage() {
 		Version:    "*",
 	})
 	_ = state.RemovePackage("test")
-	json, _ := state.ToJSON()
+	json, _ := state.MarshalJSON()
 	fmt.Println(string(json))
 	// Output:
 	// {
@@ -172,6 +195,7 @@ func TestPackageState_RemovePackage_otherDependency(t *testing.T) {
 	}
 	_ = state.AddPackage(dep)
 	_ = state.AddPackage(config.PackageInfoRemote{
+		Name:         "X",
 		Dependencies: []string{"test"},
 	}, dep)
 	// There is a dependency on "test".

@@ -15,18 +15,21 @@ type Manifest struct {
 func LoadManifest(path string) (*Manifest, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, NewVesselError(err)
 	}
 	return NewManifest(raw)
 }
 
 func NewManifest(raw []byte) (*Manifest, error) {
 	var manifest Manifest
-	return &manifest, dhall.Unmarshal(raw, &manifest)
+	if err := dhall.Unmarshal(raw, &manifest); err != nil {
+		return nil, NewVesselError(err)
+	}
+	return &manifest, nil
 }
 
-func (m Manifest) Oko(set PackageSet) config.Package {
-	return config.Package{
+func (m Manifest) Oko(set PackageSet) config.PackageConfig {
+	return config.PackageConfig{
 		CompilerVersion: m.Compiler,
 		Dependencies:    set.Oko(),
 	}
@@ -34,5 +37,8 @@ func (m Manifest) Oko(set PackageSet) config.Package {
 
 func (m Manifest) Save(path string, set PackageSet) error {
 	pkg := m.Oko(set)
-	return config.NewPackageState(&pkg).Save(path)
+	if err := config.NewPackageState(&pkg).Save(path); err != nil {
+		return NewVesselError(err)
+	}
+	return nil
 }
