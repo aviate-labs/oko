@@ -1,10 +1,15 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"runtime"
 
 	"github.com/internet-computer/oko/config"
+	"github.com/internet-computer/oko/github"
 	"github.com/internet-computer/oko/internal/cmd"
 	"github.com/internet-computer/oko/internal/tar"
 )
@@ -23,7 +28,13 @@ var BinDownloadCommand = cmd.Command{
 	Name:    "download",
 	Aliases: []string{"d"},
 	Summary: "downloads the Motoko compiler",
-	Method: func(_ []string, _ map[string]string) error {
+	Options: []cmd.Option{
+		{
+			Name:     "didc",
+			HasValue: false,
+		},
+	},
+	Method: func(_ []string, options map[string]string) error {
 		pkg, err := config.LoadPackageState("./oko.json")
 		if err != nil {
 			return NewBinError(err)
@@ -53,6 +64,41 @@ var BinDownloadCommand = cmd.Command{
 		); err != nil {
 			return NewBinError(err)
 		}
+
+		if _, ok := options["didc"]; ok {
+			url := "dfinity/candid"
+			resp, err := http.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases", url))
+			if err != nil {
+				return NewBinError(err)
+			}
+			data, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return NewBinError(err)
+			}
+			var releases []github.Release
+			if err := json.Unmarshal(data, &releases); err != nil {
+				return NewBinError(err)
+			}
+			if len(releases) == 0 {
+				return NewBinError(github.NewReleasesNotFoundErrors(url))
+			}
+
+			resp, err = http.Get(fmt.Sprintf(
+				"https://github.com/%s/releases/download/%s/didc-%s",
+				url, releases[0].TagName, goos,
+			))
+			if err != nil {
+				return NewBinError(err)
+			}
+			data, err = io.ReadAll(resp.Body)
+			if err != nil {
+				return NewBinError(err)
+			}
+			if err := os.WriteFile(fmt.Sprintf(".oko/bin/%s/didc", version), data, os.ModePerm); err != nil {
+				return NewBinError(err)
+			}
+		}
+
 		return nil
 	},
 }

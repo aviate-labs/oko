@@ -132,6 +132,12 @@ Name aliases: `d`
 oko bin download
 ```
 
+##### Options
+
+|name|value|
+|---|---|
+|**didc**||
+
 #### `show`
 
 prints out the path to the bin dir
